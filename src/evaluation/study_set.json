@@ -1,0 +1,558 @@
+{
+  "services": {
+    "weather":          { "service_slug": "weather" },
+    "if_notifications": { "service_slug": "if_notifications" },
+    "date_and_time":    { "service_slug": "date_and_time" },
+    "augusthome":       { "service_slug": "augusthome" },
+    "spotify":          { "service_slug": "spotify" },
+    "green_light_signal": { "service_slug": "green_light_signal" },
+    "lifx":             { "service_slug": "lifx" },
+    "feed":             { "service_slug": "feed" },
+    "dropbox":          { "service_slug": "dropbox" },
+    "nj_transit":       { "service_slug": "nj_transit" },
+    "sms":              { "service_slug": "sms" },
+    "twitter":          { "service_slug": "twitter" },
+    "telegram":         { "service_slug": "telegram" },
+    "instagram":        { "service_slug": "instagram" },
+    "facebook_pages":   { "service_slug": "facebook_pages" },
+    "feedly":           { "service_slug": "feedly" }
+  },
+
+  "non_expert": [
+    {
+      "code": "S1",
+      "row_index": 44,
+      "complexity_tag": "simple_skip",
+      "services": ["weather", "if_notifications"],
+      "trigger_apis": ["weather.tomorrows_weather_at_time"],
+      "action_apis": ["if_notifications.send_notification"],
+
+      "title_en": "Protect plants from cold nights",
+      "title_it": "Proteggi le piante dalle notti fredde",
+
+      "background_en": "You want a reminder when tomorrow’s minimum temperature drops below a chosen threshold, so you can move your plants indoors.",
+      "background_it": "Vuoi un promemoria quando la temperatura minima di domani scende sotto una soglia scelta, così puoi spostare le piante in casa.",
+
+      "if_then_en": "IF tomorrow’s low temperature is below a threshold THEN send a notification about protecting plants.",
+      "if_then_it": "SE la minima prevista per domani è sotto una soglia ALLORA invia una notifica per proteggere le piante.",
+
+      "trigger_options": [
+        {
+          "id": "temp_threshold",
+          "label_en": "Temperature threshold",
+          "label_it": "Soglia di temperatura",
+          "description_en": "Minimum temperature that should trigger the reminder.",
+          "description_it": "Temperatura minima che deve far scattare il promemoria.",
+          "example_values_en": ["32°F", "35°F", "40°F"],
+          "example_values_it": ["0 °C", "2 °C", "4 °C"]
+        }
+      ],
+
+      "action_options": [
+        {
+          "id": "message_text",
+          "label_en": "Notification text",
+          "label_it": "Testo della notifica",
+          "description_en": "What the notification should say.",
+          "description_it": "Cosa deve dire la notifica.",
+          "example_values_en": [
+            "Freeze alert: bring the plants inside tonight!",
+            "It will be very cold tomorrow – protect your balcony plants."
+          ],
+          "example_values_it": [
+            "Allerta gelo: metti le piante al riparo stasera!",
+            "Domani farà molto freddo – proteggi le piante sul balcone."
+          ]
+        }
+      ],
+
+      "intent_examples_en": [
+        "If tomorrow’s low is below 2°C, remind me to bring my plants inside.",
+        "Warn me when it will freeze tomorrow night."
+      ],
+      "intent_examples_it": [
+        "Se la minima di domani è sotto i 2 gradi, ricordami di mettere le piante al riparo.",
+        "Avvisami se domani notte è previsto gelo."
+      ]
+    },
+
+    {
+      "code": "S2",
+      "row_index": 254,
+      "complexity_tag": "simple_no_skip",
+      "services": ["date_and_time", "if_notifications"],
+      "trigger_apis": ["date_and_time.every_hour_at"],
+      "action_apis": ["if_notifications.send_notification"],
+
+      "title_en": "Hourly drink-water reminder",
+      "title_it": "Promemoria orario per bere acqua",
+
+      "background_en": "Inside an active time window, you want periodic reminders to drink water.",
+      "background_it": "All’interno di una fascia oraria attiva vuoi promemoria periodici per bere acqua.",
+
+      "if_then_en": "IF current time is between start and end THEN send a water reminder every N hours.",
+      "if_then_it": "SE l’ora corrente è tra inizio e fine ALLORA invia un promemoria per bere ogni N ore.",
+
+      "trigger_options": [
+        {
+          "id": "start_time",
+          "label_en": "Start time",
+          "label_it": "Ora di inizio",
+          "description_en": "Time when reminders should start.",
+          "description_it": "Ora a partire dalla quale iniziano i promemoria.",
+          "example_values_en": ["09:00", "08:30"],
+          "example_values_it": ["09:00", "08:30"]
+        },
+        {
+          "id": "end_time",
+          "label_en": "End time",
+          "label_it": "Ora di fine",
+          "description_en": "Time when reminders should stop.",
+          "description_it": "Ora alla quale i promemoria devono fermarsi.",
+          "example_values_en": ["17:00", "18:00", "21:00"],
+          "example_values_it": ["17:00", "18:00", "21:00"]
+        },
+        {
+          "id": "frequency_hours",
+          "label_en": "Reminder frequency (hours)",
+          "label_it": "Frequenza promemoria (ore)",
+          "description_en": "Time between reminders.",
+          "description_it": "Intervallo di tempo tra un promemoria e l’altro.",
+          "example_values_en": ["1", "2"],
+          "example_values_it": ["1", "2"]
+        }
+      ],
+
+      "action_options": [
+        {
+          "id": "message_text",
+          "label_en": "Reminder message",
+          "label_it": "Testo del promemoria",
+          "description_en": "Friendly text to encourage hydration.",
+          "description_it": "Testo gentile per incoraggiare l’idratazione.",
+          "example_values_en": [
+            "Time to drink a glass of water 💧",
+            "Hydration check: have a sip!"
+          ],
+          "example_values_it": [
+            "È ora di bere un bicchiere d’acqua 💧",
+            "Check idratazione: bevi qualche sorso!"
+          ]
+        }
+      ],
+
+      "intent_examples_en": [
+        "Remind me every hour from 9 to 18 to drink water.",
+        "Between 8 and 20, send a notification every 2 hours to drink."
+      ],
+      "intent_examples_it": [
+        "Ricordami ogni ora dalle 9 alle 18 di bere acqua.",
+        "Tra le 8 e le 20 mandami un promemoria ogni 2 ore per bere."
+      ]
+    },
+
+    {
+      "code": "S3",
+      "row_index": 76,
+      "complexity_tag": "simple_skip",
+      "services": ["augusthome", "spotify"],
+      "trigger_apis": ["augusthome.lock_unlocked_by_specific_person"],
+      "action_apis": ["spotify.start_playback"],
+
+      "title_en": "Start Spotify when you unlock the door in the evening",
+      "title_it": "Avvia Spotify quando sblocchi la porta la sera",
+
+      "background_en": "In the evening, when a specific person unlocks the smart lock, you want music to start automatically.",
+      "background_it": "La sera, quando una persona specifica sblocca la serratura smart, vuoi che la musica parta automaticamente.",
+
+      "if_then_en": "IF the door is unlocked by you during a selected time window THEN start a Spotify playlist.",
+      "if_then_it": "SE la porta viene sbloccata da te in una certa fascia oraria ALLORA avvia una playlist Spotify.",
+
+      "trigger_options": [
+        {
+          "id": "person_name",
+          "label_en": "Who unlocks",
+          "label_it": "Chi sblocca",
+          "description_en": "Which person’s unlock event should trigger the music.",
+          "description_it": "Lo sblocco di quale persona deve attivare la musica.",
+          "example_values_en": ["Me", "Partner"],
+          "example_values_it": ["Io", "Partner"]
+        },
+        {
+          "id": "time_window",
+          "label_en": "Time window",
+          "label_it": "Finestra temporale",
+          "description_en": "Evening time range where the rule should be active.",
+          "description_it": "Fascia serale in cui la regola deve essere attiva.",
+          "example_values_en": ["18:00–22:00", "17:30–23:00"],
+          "example_values_it": ["18:00–22:00", "17:30–23:00"]
+        }
+      ],
+
+      "action_options": [
+        {
+          "id": "playlist",
+          "label_en": "Playlist or album",
+          "label_it": "Playlist o album",
+          "description_en": "What to play when you arrive.",
+          "description_it": "Cosa riprodurre quando arrivi.",
+          "example_values_en": ["Relaxing evening", "Chill jazz"],
+          "example_values_it": ["Sera rilassante", "Jazz tranquillo"]
+        }
+      ],
+
+      "intent_examples_en": [
+        "When I unlock the door after 6 PM, start my evening playlist.",
+        "If I come home between 19 and 22, play my chill playlist."
+      ],
+      "intent_examples_it": [
+        "Quando sblocco la porta dopo le 18, avvia la mia playlist serale.",
+        "Se arrivo a casa tra le 19 e le 22, fai partire la playlist chill."
+      ]
+    },
+
+    {
+      "code": "C1",
+      "row_index": 126,
+      "complexity_tag": "complex_single_action_multi_conditions",
+      "services": ["green_light_signal", "lifx"],
+      "trigger_apis": ["green_light_signal.co2_level"],
+      "action_apis": ["lifx.color"],
+
+      "title_en": "Use a LIFX lamp to show grid CO₂ levels",
+      "title_it": "Usa una lampada LIFX per mostrare i livelli di CO₂ della rete",
+
+      "background_en": "You want your lamp color to reflect how clean or dirty the electric grid currently is.",
+      "background_it": "Vuoi che il colore della lampada rifletta quanto è pulita o sporca la rete elettrica.",
+
+      "if_then_en": "IF CO₂ intensity is low/medium/high THEN set the lamp to green/yellow/red.",
+      "if_then_it": "SE l’intensità di CO₂ è bassa/media/alta ALLORA imposta la lampada su verde/giallo/rosso.",
+
+      "trigger_options": [
+        {
+          "id": "region",
+          "label_en": "Grid region",
+          "label_it": "Regione della rete",
+          "description_en": "Which region’s CO₂ intensity you monitor.",
+          "description_it": "Di quale regione monitori l’intensità di CO₂.",
+          "example_values_en": ["DE", "UK", "California"],
+          "example_values_it": ["DE", "UK", "California"]
+        },
+        {
+          "id": "co2_ranges",
+          "label_en": "CO₂ ranges",
+          "label_it": "Intervalli di CO₂",
+          "description_en": "Define ranges for low/medium/high CO₂.",
+          "description_it": "Definisci intervalli per CO₂ bassa/media/alta.",
+          "example_values_en": ["low < 300, medium 300–500, high > 500 g/kWh"],
+          "example_values_it": ["bassa < 300, media 300–500, alta > 500 g/kWh"]
+        }
+      ],
+
+      "action_options": [
+        {
+          "id": "colors",
+          "label_en": "Color mapping",
+          "label_it": "Mappatura colori",
+          "description_en": "Which color to use for each CO₂ range.",
+          "description_it": "Che colore usare per ogni intervallo di CO₂.",
+          "example_values_en": ["low=green, medium=yellow, high=red"],
+          "example_values_it": ["bassa=verde, media=giallo, alta=rosso"]
+        }
+      ]
+    },
+
+    {
+      "code": "C2",
+      "row_index": 238,
+      "complexity_tag": "complex_multi_action",
+      "services": ["feed", "dropbox"],
+      "trigger_apis": ["feed.new_feed_item"],
+      "action_apis": ["dropbox.create_text_file_db", "dropbox.add_file_from_url"],
+
+      "title_en": "Save images and links from an RSS feed to Dropbox",
+      "title_it": "Salva immagini e link da un feed RSS su Dropbox",
+
+      "background_en": "For each new article, you want both a URL shortcut and the main image saved in Dropbox.",
+      "background_it": "Per ogni nuovo articolo vuoi salvare su Dropbox sia un collegamento al link che l’immagine principale.",
+
+      "if_then_en": "IF a new item appears in the feed THEN create a URL file and, if an image exists, download it.",
+      "if_then_it": "SE compare un nuovo elemento nel feed ALLORA crea un file URL e, se c’è un’immagine, scaricala.",
+
+      "trigger_options": [
+        {
+          "id": "feed_url",
+          "label_en": "RSS feed URL",
+          "label_it": "URL del feed RSS",
+          "description_en": "Which feed should be monitored.",
+          "description_it": "Quale feed deve essere monitorato.",
+          "example_values_en": [
+            "https://example.com/rss",
+            "https://news.example.org/feed.xml"
+          ],
+          "example_values_it": [
+            "https://example.com/rss",
+            "https://news.example.org/feed.xml"
+          ]
+        }
+      ],
+
+      "action_options": [
+        {
+          "id": "links_folder",
+          "label_en": "Folder for link files",
+          "label_it": "Cartella per file link",
+          "description_en": "Where to store .url/.txt files with article links.",
+          "description_it": "Dove salvare i file .url/.txt con i link agli articoli.",
+          "example_values_en": ["/RSS/Links", "/ReadingList/Links"],
+          "example_values_it": ["/RSS/Link", "/ListaLettura/Link"]
+        },
+        {
+          "id": "images_folder",
+          "label_en": "Folder for images",
+          "label_it": "Cartella per immagini",
+          "description_en": "Where to store images downloaded from the articles.",
+          "description_it": "Dove salvare le immagini scaricate dagli articoli.",
+          "example_values_en": ["/RSS/Images"],
+          "example_values_it": ["/RSS/Immagini"]
+        }
+      ]
+    },
+
+    {
+      "code": "C3",
+      "row_index": 66,
+      "complexity_tag": "complex_single_action_multi_conditions",
+      "services": ["nj_transit", "sms"],
+      "trigger_apis": ["nj_transit.new_bus_advisory"],
+      "action_apis": ["sms.send_me_text"],
+
+      "title_en": "SMS alerts for NJ Transit bus advisories during your commute",
+      "title_it": "SMS per avvisi NJ Transit durante il tragitto casa–lavoro",
+
+      "background_en": "You only care about bus advisories that affect your usual commute and occur during commute hours.",
+      "background_it": "Ti interessano solo gli avvisi sugli autobus che riguardano il tuo tragitto abituale e arrivano negli orari di pendolarismo.",
+
+      "if_then_en": "IF a new advisory matches your route AND is within commute hours THEN send an SMS.",
+      "if_then_it": "SE un nuovo avviso riguarda la tua linea E cade nella fascia del tragitto ALLORA manda un SMS.",
+
+      "trigger_options": [
+        {
+          "id": "route_keyword",
+          "label_en": "Route keyword",
+          "label_it": "Parola chiave linea",
+          "description_en": "A word or number that identifies your bus line/stop.",
+          "description_it": "Una parola o un numero che identifica la tua linea/fermata.",
+          "example_values_en": ["Bus 123", "Port Authority"],
+          "example_values_it": ["Bus 123", "Port Authority"]
+        },
+        {
+          "id": "commute_window",
+          "label_en": "Commute hours",
+          "label_it": "Orari del tragitto",
+          "description_en": "Morning and/or evening commute periods.",
+          "description_it": "Fasce orarie del tragitto mattino/sera.",
+          "example_values_en": ["07:00–09:30 and 16:30–19:30"],
+          "example_values_it": ["07:00–09:30 e 16:30–19:30"]
+        }
+      ],
+
+      "action_options": [
+        {
+          "id": "sms_text",
+          "label_en": "SMS content",
+          "label_it": "Contenuto dell’SMS",
+          "description_en": "What information to include (title, route, URL, etc.).",
+          "description_it": "Quali informazioni includere (titolo, linea, URL, ecc.).",
+          "example_values_en": [
+            "[NJ Transit] Advisory for bus 123: {title} – {url}"
+          ],
+          "example_values_it": [
+            "[NJ Transit] Avviso per bus 123: {title} – {url}"
+          ]
+        }
+      ]
+    }
+  ],
+
+
+  "expert": [
+  {
+    "code": "E1",
+    "row_index": 126,
+    "base_scenario_ref": "C1",
+    "services": ["green_light_signal", "lifx"],
+    "trigger_apis": ["green_light_signal.co2_level"],
+    "action_apis": ["lifx.color"],
+
+    "title_en": "Advanced CO₂-based LIFX signal",
+    "title_it": "Segnale LIFX avanzato basato sulla CO₂",
+
+    "background_en": "Similar to the non-expert CO₂ scenario, but here you must explicitly implement the full decision logic in filter code. Based on CO₂ intensity ranges, you must choose the correct color and set the lamp accordingly, using only the allowed Green Light Signal accessors and LIFX methods.",
+    "background_it": "Devi implementare nel filter code una logica decisionale completa che, a partire dall’intensità attuale di CO₂ della rete elettrica, determini il colore da assegnare a una lampada LIFX. In base a intervalli di CO₂ definiti, devi selezionare il colore appropriato e impostarlo utilizzando esclusivamente gli accessor consentiti di Green Light Signal e i metodi disponibili di LIFX.",
+
+    "if_then_en": "IF the current CO₂ intensity is within a defined range (low, medium, high) THEN set the LIFX lamp color according to the specified mapping.",
+    "if_then_it": "SE l’intensità attuale di CO₂ rientra in un intervallo definito (basso, medio, alto) ALLORA imposta il colore della lampada LIFX secondo la mappatura specificata.",
+
+    "intent_examples_en": [
+      "If CO₂ is below 300 g/kWh, set the lamp to green; if between 300 and 500, yellow; otherwise red.",
+      "Change the lamp color based on the current grid CO₂ level."
+    ],
+    "intent_examples_it": [
+      "Se la CO₂ è sotto i 300 g/kWh imposta la lampada su verde, tra 300 e 500 su giallo, altrimenti su rosso.",
+      "Cambia il colore della lampada in base al livello attuale di CO₂ della rete."
+    ]
+  },
+
+  {
+    "code": "E2",
+    "row_index": 84,
+    "services": ["twitter", "telegram"],
+    "trigger_apis": ["twitter.new_tweet_by_user"],
+    "action_apis": ["telegram.send_message"],
+
+    "title_en": "Forward tweets without images to Telegram",
+    "title_it": "Inoltra i tweet senza immagini a Telegram",
+
+    "background_en": "When a specific user posts a tweet, you must inspect the tweet content. Tweets containing images must be skipped. Tweets without images must be forwarded to Telegram with a formatted message built from tweet metadata.",
+    "background_it": "Quando un utente specifico pubblica un tweet, devi analizzarne il contenuto. I tweet che contengono immagini devono essere scartati. I tweet senza immagini devono essere inoltrati su Telegram con un messaggio formattato costruito a partire dai metadati del tweet.",
+
+    "if_then_en": "IF a new tweet by the specified user does NOT contain images THEN send a formatted Telegram message; OTHERWISE skip the action.",
+    "if_then_it": "SE un nuovo tweet dell’utente specificato NON contiene immagini ALLORA invia un messaggio Telegram formattato; ALTRIMENTI salta l’azione.",
+
+    "intent_examples_en": [
+      "When @user tweets without images, forward the text and date to Telegram.",
+      "Skip tweets with photos, but forward plain-text tweets to my Telegram channel."
+    ],
+    "intent_examples_it": [
+      "Quando @user twitta senza immagini, inoltra testo e data su Telegram.",
+      "Salta i tweet con foto, ma inoltra quelli solo testuali su Telegram."
+    ]
+  },
+
+  {
+    "code": "E3",
+    "row_index": 238,
+    "base_scenario_ref": "C2",
+    "services": ["feed", "dropbox"],
+    "trigger_apis": ["feed.new_feed_item"],
+    "action_apis": ["dropbox.create_text_file_db", "dropbox.add_file_from_url"],
+
+    "title_en": "RSS to Dropbox with custom conditions",
+    "title_it": "RSS su Dropbox con condizioni personalizzate",
+
+    "background_en": "For each new feed item, you must inspect its properties (such as presence of images or keywords) and decide which Dropbox actions to perform. Different conditions may trigger different combinations of actions.",
+    "background_it": "Per ogni nuovo elemento del feed, devi analizzarne le proprietà (come presenza di immagini o parole chiave) e decidere quali azioni Dropbox eseguire. Condizioni diverse possono attivare combinazioni diverse di azioni.",
+
+    "if_then_en": "IF a new feed item contains an image THEN save the image; IF it contains a link THEN create a link file; IF both are present THEN perform both actions.",
+    "if_then_it": "SE un nuovo elemento del feed contiene un’immagine ALLORA salva l’immagine; SE contiene un link ALLORA crea un file link; SE sono presenti entrambi ALLORA esegui entrambe le azioni.",
+
+    "intent_examples_en": [
+      "Save only the image if the article has no link.",
+      "For each RSS item, save both the image and the link when available."
+    ],
+    "intent_examples_it": [
+      "Salva solo l’immagine se l’articolo non ha un link.",
+      "Per ogni elemento RSS, salva sia l’immagine che il link quando disponibili."
+    ]
+  },
+
+  {
+    "code": "E4",
+    "row_index": 92,
+    "services": ["instagram", "facebook_pages"],
+    "trigger_apis": ["instagram.any_new_photo_by_you"],
+    "action_apis": ["facebook_pages.create_photo_page"],
+
+    "title_en": "Post Instagram photos into month-based Facebook albums",
+    "title_it": "Pubblica le foto Instagram in album Facebook per mese",
+
+    "background_en": "When you post a new Instagram photo, you must compute the correct Facebook album name based on the date and upload the photo with an appropriate caption.",
+    "background_it": "Quando pubblichi una nuova foto su Instagram, devi calcolare il nome corretto dell’album Facebook in base alla data e caricare la foto con una didascalia appropriata.",
+
+    "if_then_en": "IF a new Instagram photo is posted THEN compute the album name from the month and upload the photo to that album on Facebook.",
+    "if_then_it": "SE viene pubblicata una nuova foto su Instagram ALLORA calcola il nome dell’album in base al mese e carica la foto in quell’album su Facebook.",
+
+    "intent_examples_en": [
+      "Post each Instagram photo into a Facebook album named after the current month.",
+      "Group Instagram photos into monthly Facebook albums automatically."
+    ],
+    "intent_examples_it": [
+      "Pubblica ogni foto Instagram in un album Facebook con il nome del mese corrente.",
+      "Raggruppa automaticamente le foto Instagram in album Facebook mensili."
+    ]
+  },
+
+  {
+    "code": "E5",
+    "row_index": 66,
+    "base_scenario_ref": "C3",
+    "services": ["nj_transit", "sms"],
+    "trigger_apis": ["nj_transit.new_bus_advisory"],
+    "action_apis": ["sms.send_me_text"],
+
+    "title_en": "Expert commute alerts with multi-criteria checks",
+    "title_it": "Avvisi di pendolarismo avanzati con controlli multipli",
+
+    "background_en": "You must filter transit advisories using multiple criteria, such as weekday, commute time windows, and route keywords, before deciding whether to send an SMS.",
+    "background_it": "Devi filtrare gli avvisi di trasporto usando più criteri, come giorno della settimana, fasce orarie di pendolarismo e parole chiave sulla linea, prima di decidere se inviare un SMS.",
+
+    "if_then_en": "IF a new advisory matches the route keyword AND occurs during commute hours on a weekday THEN send an SMS; OTHERWISE skip it.",
+    "if_then_it": "SE un nuovo avviso riguarda la linea indicata E cade negli orari di pendolarismo in un giorno feriale ALLORA invia un SMS; ALTRIMENTI scartalo.",
+
+    "intent_examples_en": [
+      "Send me an SMS only for bus advisories on my route during weekday mornings.",
+      "Ignore advisories outside my commute hours."
+    ],
+    "intent_examples_it": [
+      "Mandami un SMS solo per avvisi della mia linea durante le mattine feriali.",
+      "Ignora gli avvisi fuori dagli orari del mio tragitto."
+    ]
+  },
+
+  {
+    "code": "E6",
+    "row_index": 305,
+    "services": ["twitter", "if_notifications", "feedly"],
+    "trigger_apis": ["twitter.new_tweet_by_user"],
+    "action_apis": ["if_notifications.send_notification", "feedly.create_new_entry_feedly"],
+
+    "title_en": "Twitter notifications with Feedly saving and quiet hours",
+    "title_it": "Notifiche Twitter con salvataggio in Feedly e orari silenziosi",
+
+    "background_en": "When a specific user tweets, you must apply quiet-hour rules, decide whether to notify the user, and optionally save the tweet to Feedly based on its content.",
+    "background_it": "Quando un utente specifico twitta, devi applicare regole di orario silenzioso, decidere se inviare una notifica e opzionalmente salvare il tweet su Feedly in base al contenuto.",
+
+    "if_then_en": "IF a tweet is posted outside quiet hours THEN send a notification; IF the tweet matches saving criteria THEN also save it to Feedly.",
+    "if_then_it": "SE un tweet viene pubblicato fuori dagli orari silenziosi ALLORA invia una notifica; SE il tweet soddisfa i criteri di salvataggio ALLORA salvalo anche su Feedly.",
+
+    "intent_examples_en": [
+      "Notify me of tweets during the day and save important ones to Feedly.",
+      "Do not notify me at night, but still archive relevant tweets."
+    ],
+    "intent_examples_it": [
+      "Notificami i tweet durante il giorno e salva quelli importanti su Feedly.",
+      "Non inviarmi notifiche di notte, ma archivia comunque i tweet rilevanti."
+    ]
+  }
+],
+
+  "questionnaires": {
+    "sus": {
+      "label": "System Usability Scale (SUS)",
+      "label_it": "System Usability Scale (SUS)",
+      "description_en": "10-item standardized questionnaire for perceived usability.",
+      "description_it": "Questionario standardizzato di 10 item per misurare l’usabilità percepita.",
+      "info_url": "https://en.wikipedia.org/wiki/System_usability_scale",
+      "questionnaire_url": "https://site.unibo.it/hfrs/en/questionnaire-and-scales-2/sus"
+    },
+    "nasa_tlx": {
+      "label": "NASA Task Load Index (NASA-TLX)",
+      "label_it": "NASA Task Load Index (NASA-TLX)",
+      "description_en": "Multidimensional workload scale (mental, physical, temporal, effort, performance, frustration).",
+      "description_it": "Scala multidimensionale del carico di lavoro (domanda mentale, fisica, temporale, sforzo, performance, frustrazione).",
+      "info_url": "https://en.wikipedia.org/wiki/NASA-TLX",
+      "questionnaire_url": "https://humansystems.arc.nasa.gov/groups/TLX/downloads/TLX.pdf"
+    }
+  }
+}

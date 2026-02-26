@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment
+.venv/
+
+# IDE
+.idea/
+
+# HuggingFace models (41 GB)
+models/
+
+# Legacy data (455 MB)
+data/_legacy/
+data/dataset/applets/applets_old/
+
+# Cache
+cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Temp files in notebooks
+notebooks/analysis/temp
+notebooks/test/output/

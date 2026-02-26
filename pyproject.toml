@@ -1,0 +1,33 @@
+[project]
+name = "nl2tap_research"
+version = "0.1.0"
+description = "NL2TAP Research: IFTTT filter code generation via LLM."
+requires-python = ">=3.9"
+dependencies = [
+    "requests",
+    "beautifulsoup4",
+    "lxml",
+    "pandas",
+    "numpy",
+    "tqdm",
+    "transformers",
+    "accelerate",
+    "peft",
+    "trl",
+    "sentence-transformers",
+    "scikit-learn",
+    "seaborn",
+    "nltk",
+    "rouge-score",
+    "bert-score",
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
