@@ -1,0 +1,53 @@
+<html><head><script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script><style>body{margin:0;padding:8px;background:transparent;}.mermaid{text-align:center;}</style></head><body><div class="mermaid">
+flowchart TD
+    N1(["Filter Code"])
+    N2{"<span class='fc-ing' style='color:＃4e342e'>Contenuto dell..."}
+    N1 --> N2
+    N3[/"<ol class='fc-and-list'><li><b>Crea un file di testo</b><..."/]
+    N2 -->|"Si"| N3
+    N4[/"<ol class='fc-and-list'><li><b>Aggiungi file dall'URL</b>..."/]
+    N3 --> N4
+    N5["Crea un file di testo — imposta Nome del file = Titolo della voce.replace(/[\..."]
+    N4 --> N5
+    N2 -->|"No"| N5
+    N6["Crea un file di testo — imposta Contenuto = Contenuto della voce"]
+    N5 --> N6
+    N7["Crea un file di testo — imposta Percorso della cartella Dropbox = RSS Feed Items"]
+    N6 --> N7
+    N8{"<span class='fc-ing' style='color:＃c62828'>URL immagine d..."}
+    N7 --> N8
+    N9["Aggiungi file dall'URL — imposta Nome del file = Titolo della voce.replace(/[..."]
+    N8 -->|"Si"| N9
+    N10["Aggiungi file dall'URL — imposta Percorso della cartella Dropbox = RSS Feed I..."]
+    N9 --> N10
+    N11["Aggiungi file dall'URL — imposta URL del file = URL immagine della voce"]
+    N10 --> N11
+    N12(["End"])
+    N11 --> N12
+    N8 -->|"No"| N12
+    style N1 fill:#e3f2fd,stroke:#42a5f5,color:#1565c0
+    style N2 fill:#fff3e0,stroke:#ff9800,color:#e65100
+    style N3 fill:#ffebee,stroke:#e53935,color:#c62828
+    style N4 fill:#ffebee,stroke:#e53935,color:#c62828
+    style N5 fill:#e8f5e9,stroke:#4caf50,color:#2e7d32
+    style N6 fill:#e8f5e9,stroke:#4caf50,color:#2e7d32
+    style N7 fill:#e8f5e9,stroke:#4caf50,color:#2e7d32
+    style N8 fill:#fff3e0,stroke:#ff9800,color:#e65100
+    style N9 fill:#e8f5e9,stroke:#4caf50,color:#2e7d32
+    style N10 fill:#e8f5e9,stroke:#4caf50,color:#2e7d32
+    style N11 fill:#e8f5e9,stroke:#4caf50,color:#2e7d32
+    style N12 fill:#e3f2fd,stroke:#42a5f5,color:#1565c0
+    linkStyle 0 stroke:#607d8b,stroke-width:1.5px
+    linkStyle 1 stroke:#e53935,stroke-width:2px
+    linkStyle 2 stroke:#e53935,stroke-width:2px
+    linkStyle 3 stroke:#4caf50,stroke-width:2px
+    linkStyle 4 stroke:#4caf50,stroke-width:2px
+    linkStyle 5 stroke:#4caf50,stroke-width:2px
+    linkStyle 6 stroke:#4caf50,stroke-width:2px
+    linkStyle 7 stroke:#607d8b,stroke-width:1.5px
+    linkStyle 8 stroke:#4caf50,stroke-width:2px
+    linkStyle 9 stroke:#4caf50,stroke-width:2px
+    linkStyle 10 stroke:#4caf50,stroke-width:2px
+    linkStyle 11 stroke:#607d8b,stroke-width:1.5px
+    linkStyle 12 stroke:#607d8b,stroke-width:1.5px
+</div><script>mermaid.initialize({startOnLoad:false,theme:"base",securityLevel:"loose"});mermaid.run({querySelector:".mermaid"}).then(function(){  var svg=document.querySelector(".mermaid svg");  if(!svg)return;  var h=Math.ceil(svg.getBoundingClientRect().height)+20;  document.body.style.height=h+"px";  try{    var fr=window.frameElement;    if(fr){      fr.style.height=h+"px";      var p=fr.parentElement;      if(p)p.style.height=h+"px";    }  }catch(e){}});</script></body></html>
