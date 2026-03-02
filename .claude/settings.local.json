@@ -3,7 +3,33 @@
     "allow": [
       "Bash(find:*)",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(read f:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(wc:*)",
+      "Bash(python:*)",
+      "Bash(streamlit run:*)",
+      "WebSearch",
+      "WebFetch(domain:pypi.org)",
+      "WebFetch(domain:github.com)",
+      "Bash(pip install:*)",
+      "Bash(pip show:*)",
+      "Bash(pip uninstall:*)",
+      "Bash(python3:*)",
+      "Bash(xargs grep:*)",
+      "Bash(curl:*)",
+      "Bash(netstat:*)",
+      "Bash(tasklist:*)",
+      "Bash(taskkill:*)",
+      "Bash(PYTHONIOENCODING=utf-8 python:*)",
+      "Bash(git checkout:*)",
+      "WebFetch(domain:localhost)",
+      "Bash(PYTHONIOENCODING=utf-8 python3:*)",
+      "Bash(jupyter nbconvert:*)",
+      "Bash(python 2:*)",
+      "Bash(rm:*)"
     ]
   }
 }

@@ -10,13 +10,25 @@ import streamlit as st
 # PAGE CONFIG
 # ============================================================
 
-st.set_page_config(page_title="Filter Code User Study", layout="wide")
+st.set_page_config(
+    page_title="Filter Code User Study",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
+
+# Hide entire sidebar on Home
+st.markdown("""
+<style>
+[data-testid="stSidebar"] { display: none; }
+[data-testid="stSidebarCollapsedControl"] { display: none; }
+</style>
+""", unsafe_allow_html=True)
 
 # ============================================================
 # TITLE & INTRO
 # ============================================================
 
-st.title("👋 Filter Code User Study")
+st.title("Filter Code User Study")
 
 st.markdown("""
 Benvenuta/o nello studio sperimentale.
@@ -34,31 +46,24 @@ Osserviamo:
 st.markdown("---")
 
 # ============================================================
-# USER ID
+# LANGUAGE
 # ============================================================
 
-st.subheader("🆔 ID utente (anonimo)")
+st.subheader("Lingua / Language")
 
-if "user_id" not in st.session_state:
-    st.session_state.user_id = ""
-
-user_id_input = st.text_input(
-    "Inserisci un ID anonimo",
-    value=st.session_state.user_id,
-    placeholder="es. user_01, exp_A12, test_003"
+lang = st.radio(
+    "Scegli la lingua",
+    ["it", "en"],
+    format_func=lambda x: "\U0001f1ee\U0001f1f9 Italiano" if x == "it" else "\U0001f1ec\U0001f1e7 English",
+    horizontal=True,
 )
 
-if st.button("Conferma ID"):
-    uid = user_id_input.strip()
-    if uid:
-        st.session_state.user_id = uid
-        st.success(f"ID impostato correttamente: `{uid}`")
-    else:
-        st.error("Inserisci un ID valido.")
+st.session_state.lang = lang
 
-if not st.session_state.user_id:
-    st.warning("⚠ Devi impostare un ID prima di continuare.")
-    st.stop()
+st.caption(
+    "Nota: il **codice generato è sempre in JavaScript**. "
+    "La lingua influenza solo testi e descrizioni."
+)
 
 st.markdown("---")
 
@@ -66,7 +71,7 @@ st.markdown("---")
 # USER TYPE
 # ============================================================
 
-st.subheader("👤 Tipo di utente")
+st.subheader("Profilo utente")
 
 user_type = st.radio(
     "Seleziona il tuo profilo",
@@ -97,24 +102,31 @@ else:
 st.markdown("---")
 
 # ============================================================
-# LANGUAGE
+# USER ID
 # ============================================================
 
-st.subheader("🌍 Lingua dell’interfaccia")
+st.subheader("ID partecipante")
 
-lang = st.radio(
-    "Scegli la lingua",
-    ["it", "en"],
-    format_func=lambda x: "Italiano" if x == "it" else "English",
-    horizontal=True
+if "user_id" not in st.session_state:
+    st.session_state.user_id = ""
+
+user_id_input = st.text_input(
+    "Inserisci un ID anonimo",
+    value=st.session_state.user_id,
+    placeholder="es. user_01, exp_A12, test_003"
 )
 
-st.session_state.lang = lang
+if st.button("Conferma ID"):
+    uid = user_id_input.strip()
+    if uid:
+        st.session_state.user_id = uid
+        st.success(f"ID impostato correttamente: `{uid}`")
+    else:
+        st.error("Inserisci un ID valido.")
 
-st.caption(
-    "Nota: il **codice generato è sempre in JavaScript**. "
-    "La lingua influenza solo testi e descrizioni."
-)
+if not st.session_state.user_id:
+    st.warning("⚠ Devi impostare un ID prima di continuare.")
+    st.stop()
 
 st.markdown("---")
 
@@ -122,7 +134,7 @@ st.markdown("---")
 # START STUDY
 # ============================================================
 
-st.subheader("🚀 Avvio dello studio")
+st.subheader("Avvio dello studio")
 
 st.markdown("""
 Quando sei pronta/o:
@@ -132,5 +144,5 @@ Quando sei pronta/o:
 - valuterai o correggerai il codice prodotto.
 """)
 
-if st.button("➡ Inizia lo studio"):
-    st.switch_page("pages/2_Selezione_scenario.py")
+if st.button("Inizia lo studio"):
+    st.switch_page("pages/2_Studio.py")

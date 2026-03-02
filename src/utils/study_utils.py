@@ -157,7 +157,7 @@ from llm_utility.prompts.utility import (
     PROMPT_CONFIGS,
 )
 
-STUDY_PATH    = Path(os.path.join(BASE,"src/evaluation/study_set.json"))
+STUDY_PATH    = Path(os.path.join(BASE,"src/evaluation/study_set_enriched.json"))
 SERVICES_PATH = Path(os.path.join(BASE,"data/ifttt_catalog/services.json"))
 TRIGGERS_PATH = Path(os.path.join(BASE,"data/ifttt_catalog/triggers.json"))
 ACTIONS_PATH  = Path(os.path.join(BASE,"data/ifttt_catalog/actions.json"))
