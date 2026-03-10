@@ -48,3 +48,12 @@ from .feedback import (
     L1Report, L2Report,
     run_l1_validation, run_l2_validation, validate_filter_code,
 )
+
+# Agent Support (diagnosis + suggestions + orchestrator)
+from .agent_support import (
+    AgentDiagnosis,
+    suggest_api_fixes, build_diagnosis_prompt, run_agent_diagnosis,
+    run_agent_followup, render_intent_diff_html,
+    OrchestratorResult, run_orchestrator_turn, build_api_surface_text,
+    ORCHESTRATOR_TOOLS,
+)

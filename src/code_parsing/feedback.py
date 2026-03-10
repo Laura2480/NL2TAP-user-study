@@ -271,21 +271,33 @@ def run_l1_validation(
 _L2_PROMPT_TEMPLATE = """\
 You are an IFTTT automation rule judge.
 
+IMPORTANT: Write ALL text (explanation, suggestions) in {response_lang}. \
+Only code identifiers and API names stay in English.
+
+## IFTTT Platform Rules
+1. **Skip is STICKY**: if skip() is called on an action at ANY point during a single \
+execution flow, that action will NOT execute, even if setters are also called on it \
+in the same flow. skip() always wins over setters, regardless of call order. \
+So code like: Action.skip(); Action.setX("val"); is CORRECT if the intent is to skip.
+2. Actions that are neither set nor skipped will execute with default/empty values.
+
 ## User Intent
 {user_intent}
 
-## Code Behavior (semantic paths from analysis)
-{outcomes_text}
+## Generated Filter Code
+```javascript
+{code}
+```
 
-## API Usage
+## Available API Surface
   Getters: {getters}
   Setters: {setters}
+  Available skip targets: {skips}
 
 ## Task
-Does the code behavior match the user intent? Consider:
-1. Are the correct triggers/conditions checked?
-2. Are the right actions taken (setter calls)?
-3. Are skip conditions appropriate?
+Read the actual code above and determine if it correctly implements the user intent. \
+Consider the IFTTT platform rules (especially sticky skip). \
+Check that conditions, getter usage, setter calls, and skip logic are all correct.
 
 Respond in JSON: {{"intent_match": true/false, "explanation": "...", "suggestions": [...]}}
 """
@@ -322,6 +334,7 @@ def _parse_l2_response(raw: str) -> dict:
 def run_l2_validation(
     user_intent: str,
     l1_report: L1Report,
+    code: str = "",
     endpoint: str = "http://localhost:1234/api/v0/chat/completions",
     model: str = "ft_2_deepseek_merged",
     lang: str = "en",
@@ -329,6 +342,7 @@ def run_l2_validation(
 ) -> L2Report:
     """
     Level-2 LLM-based validation: checks if code behavior matches user intent.
+    The LLM receives the actual generated code and IFTTT platform rules.
     """
     if not l1_report.syntax_ok:
         return L2Report(
@@ -337,16 +351,19 @@ def run_l2_validation(
             error="l1_syntax_error",
         )
 
-    # Build outcomes text
-    outcomes_text = "\n".join(f"  - {line}" for line in l1_report.outcomes_summary) or "  (no semantic paths extracted)"
     getters_str = str(l1_report.used_getters) if l1_report.used_getters else "[]"
     setters_str = str(l1_report.used_setters) if l1_report.used_setters else "[]"
 
+    skips_str = str(l1_report.api_report.skip_available) if l1_report.api_report and l1_report.api_report.skip_available else "[]"
+
+    response_lang = "Italian" if lang == "it" else "English"
     prompt = _L2_PROMPT_TEMPLATE.format(
         user_intent=user_intent,
-        outcomes_text=outcomes_text,
         getters=getters_str,
         setters=setters_str,
+        skips=skips_str,
+        response_lang=response_lang,
+        code=code,
     )
 
     payload = {
@@ -366,8 +383,10 @@ def run_l2_validation(
 
     parsed = _parse_l2_response(raw)
 
+    intent_match = bool(parsed.get("intent_match", False))
+
     return L2Report(
-        intent_match=bool(parsed.get("intent_match", False)),
+        intent_match=intent_match,
         explanation=str(parsed.get("explanation", "")),
         suggestions=list(parsed.get("suggestions", [])),
         raw_response=raw,
@@ -405,6 +424,7 @@ def validate_filter_code(
         l2 = run_l2_validation(
             user_intent=intent,
             l1_report=l1,
+            code=code,
             endpoint=endpoint,
             model=model,
             lang=lang,

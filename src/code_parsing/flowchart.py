@@ -1463,15 +1463,30 @@ def _html_to_plain(html_text: str) -> str:
     return t.strip(' \u2014')
 
 
-def _mermaid_safe(text: str, max_len: int = 80) -> str:
-    """Sanitize text for Mermaid node labels (inside double quotes)."""
-    if len(text) > max_len:
-        text = text[:max_len - 3] + "..."
+def _mermaid_safe(text: str, wrap_at: int = 50) -> str:
+    """Sanitize text for Mermaid node labels — word-wrap instead of truncating."""
     text = text.replace('"', "'")
     text = text.replace('{', '(')
     text = text.replace('}', ')')
     # Fullwidth hash to avoid Mermaid entity syntax (#NN;)
     text = text.replace('#', '\uff03')
+    # Word-wrap long text using <br> (Mermaid supports HTML in loose mode)
+    if len(text) > wrap_at:
+        words = text.split(' ')
+        lines: List[str] = []
+        current_line: List[str] = []
+        current_len = 0
+        for w in words:
+            if current_len + len(w) + 1 > wrap_at and current_line:
+                lines.append(' '.join(current_line))
+                current_line = [w]
+                current_len = len(w)
+            else:
+                current_line.append(w)
+                current_len += len(w) + 1
+        if current_line:
+            lines.append(' '.join(current_line))
+        text = '<br>'.join(lines)
     return text
 
 
@@ -1534,26 +1549,26 @@ def render_code_flowchart_html(
 
     def _diamond(text):
         n = _nid()
-        mmd.append(f'    {n}{{"{_mermaid_safe(text, 60)}"}}')
+        mmd.append(f'    {n}{{"{_mermaid_safe(text, 45)}"}}')
         node_type[n] = "cond"
         return n
 
     def _rect(text):
         n = _nid()
-        mmd.append(f'    {n}["{_mermaid_safe(text, 80)}"]')
+        mmd.append(f'    {n}["{_mermaid_safe(text, 50)}"]')
         node_type[n] = "action"
         return n
 
     def _skip_node(text):
         n = _nid()
         label = f"SKIP: {text}"
-        mmd.append(f'    {n}[/"{_mermaid_safe(label, 70)}"/]')
+        mmd.append(f'    {n}[/"{_mermaid_safe(label, 50)}"/]')
         node_type[n] = "skip"
         return n
 
     def _invalid_node(text):
         n = _nid()
-        mmd.append(f'    {n}["{_mermaid_safe(text, 80)}"]')
+        mmd.append(f'    {n}["{_mermaid_safe(text, 50)}"]')
         node_type[n] = "invalid"
         return n
 
@@ -1746,7 +1761,8 @@ def render_code_flowchart_html(
         '</head><body>'
         f'<div class="mermaid">\n{mermaid_src}\n</div>'
         '<script>'
-        'mermaid.initialize({startOnLoad:false,theme:"base",securityLevel:"loose"});'
+        'mermaid.initialize({startOnLoad:false,theme:"base",securityLevel:"loose",'
+        'flowchart:{useMaxWidth:true,htmlLabels:true,nodeSpacing:30,rankSpacing:40}});'
         'mermaid.run({querySelector:".mermaid"}).then(function(){'
         '  var svg=document.querySelector(".mermaid svg");'
         '  if(!svg)return;'

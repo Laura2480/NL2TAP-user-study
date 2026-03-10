@@ -33,3 +33,6 @@ Thumbs.db
 # Temp files in notebooks
 notebooks/analysis/temp
 notebooks/test/output/
+
+# Paper documents (confidential)
+doc/
