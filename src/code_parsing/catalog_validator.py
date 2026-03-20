@@ -385,15 +385,20 @@ def build_display_labels(
     namespace_names = {}
     skip_labels = {}
     namespace_icons = {}
+    namespace_colors = {}
 
-    # Build service_slug -> icon_url mapping
+    # Build service_slug -> icon_url / brand_color mapping
     svc_icons = {}
+    svc_colors = {}
     if services:
         for svc in services:
             slug = svc.get("service_slug", "")
             icon = svc.get("image_url", "")
+            color = svc.get("brand_color", "")
             if slug and icon:
                 svc_icons[slug] = icon
+            if slug and color:
+                svc_colors[slug] = color
 
     slug_set_t = set(trigger_slugs)
     slug_set_a = set(action_slugs)
@@ -410,6 +415,8 @@ def build_display_labels(
             svc_slug = trig.get("service_slug", "")
             if svc_slug in svc_icons:
                 namespace_icons[ns] = svc_icons[svc_slug]
+            if svc_slug in svc_colors:
+                namespace_colors[ns] = svc_colors[svc_slug]
         for ing in trig.get("ingredients", []):
             if not isinstance(ing, dict):
                 continue
@@ -430,6 +437,8 @@ def build_display_labels(
             svc_slug = act.get("service_slug", "")
             if svc_slug in svc_icons:
                 namespace_icons[ns] = svc_icons[svc_slug]
+            if svc_slug in svc_colors:
+                namespace_colors[ns] = svc_colors[svc_slug]
 
         # Namespace-level setter (e.g. Yeelight.setScene)
         if ns and ns.split(".")[-1].startswith("set"):
@@ -464,4 +473,5 @@ def build_display_labels(
         "namespace_names": namespace_names,
         "skip_labels": skip_labels,
         "namespace_icons": namespace_icons,
+        "namespace_colors": namespace_colors,
     }

@@ -34,5 +34,14 @@ Thumbs.db
 notebooks/analysis/temp
 notebooks/test/output/
 
+# Study results (private)
+results/study.db
+results/study.db-shm
+results/study.db-wal
+results/interaction_log.jsonl
+src/evaluation/results/
+src/results/
+src/evaluation/nul
+
 # Paper documents (confidential)
 doc/

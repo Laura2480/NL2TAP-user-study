@@ -55,5 +55,16 @@ from .agent_support import (
     suggest_api_fixes, build_diagnosis_prompt, run_agent_diagnosis,
     run_agent_followup, render_intent_diff_html,
     OrchestratorResult, run_orchestrator_turn, build_api_surface_text,
+    build_api_surface_behavioral,
     ORCHESTRATOR_TOOLS,
+)
+
+# LLM API Matcher
+from .llm_api_matcher import match_api_names
+
+# Flowchart (behavioral summary + behavior flow + API warnings)
+from .flowchart import (
+    render_flowchart_html, render_code_flowchart_html,
+    render_behavioral_summary_html, render_behavior_flow_html,
+    render_api_warning_html,
 )

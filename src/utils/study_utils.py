@@ -181,8 +181,63 @@ TRIGGER_INDEX, ACTION_INDEX = load_api_indexes(
 
 SERVICE_INDEX = {s["service_slug"]: s for s in SERVICES}
 
-NON_EXP = STUDY["non_expert"]
-EXP     = STUDY["expert"]
+# 6 scenarios per type (3 per block), ordered simple → medium → complex (C1 → C2 → C3).
+#
+# Complexity classification (aligned with paper's C1/C2/C3 framework):
+#   C1 (simple):  1 action, 0-1 execution conditions (single threshold / boolean)
+#   C2 (medium):  1 action with 2+ conditions OR conditional setter values (branching)
+#   C3 (complex): 2+ actions with selective execution OR multi-branch condition logic
+#
+# Non-expert:
+#   Block 1 = S1 (C1), S3 (C2), C1 (C3)
+#   Block 2 = S2 (C1), C3 (C2), C2 (C3)
+# Expert:
+#   Block 1 = E2 (C1), E1 (C2), E3 (C3)
+#   Block 2 = E5 (C1), E4 (C2), E6 (C3)
+
+_COMPLEXITY_CLASS = {
+    # Non-expert
+    "S1": "C1",  # 1 threshold condition → notify
+    "S2": "C1",  # 1 time-range condition → notify
+    "M1": "C2",  # 2 conditions (person + time) → single action
+    "M2": "C2",  # 2 conditions (route + advisory type) → single action
+    "C1": "C3",  # multi-branch CO2 ranges → conditional color setters
+    "C2": "C3",  # 2 actions + selective skip + 6 setters
+    # Expert
+    "E5": "C1",  # 1 route-keyword filter → SMS
+    "E2": "C1",  # boolean image filter → Telegram
+    "E1": "C2",  # multi-branch CO2 → conditional LIFX color
+    "E4": "C2",  # date/month logic → conditional Facebook album
+    "E3": "C3",  # 2 actions + selective skip + 6 setters
+    "E6": "C3",  # 2 actions + quiet hours + content filtering
+}
+
+_BLOCK_ASSIGNMENTS = {
+    "S1": 1, "M1": 1, "C1": 1,
+    "S2": 2, "M2": 2, "C2": 2,
+    "E2": 1, "E1": 1, "E3": 1,
+    "E5": 2, "E4": 2, "E6": 2,
+}
+# Order within block: 0=C1(simple), 1=C2(medium), 2=C3(complex)
+_BLOCK_ORDER = {
+    "S1": 0, "M1": 1, "C1": 2,
+    "S2": 0, "M2": 1, "C2": 2,
+    "E2": 0, "E1": 1, "E3": 2,
+    "E5": 0, "E4": 1, "E6": 2,
+}
+_KEEP_NON_EXPERT = {"S1", "S2", "M1", "C1", "C2", "M2"}
+_KEEP_EXPERT = {"E1", "E2", "E3", "E4", "E5", "E6"}
+
+def _annotate_block(sc: dict) -> dict:
+    """Add pre-assigned block number, intra-block order, and complexity class."""
+    sc = dict(sc)  # shallow copy
+    sc["assigned_block"] = _BLOCK_ASSIGNMENTS.get(sc["code"], 1)
+    sc["block_order"] = _BLOCK_ORDER.get(sc["code"], 0)
+    sc["complexity_class"] = _COMPLEXITY_CLASS.get(sc["code"], sc.get("complexity_tag", "C1"))
+    return sc
+
+NON_EXP = [_annotate_block(s) for s in STUDY["non_expert"] if s["code"] in _KEEP_NON_EXPERT]
+EXP     = [_annotate_block(s) for s in STUDY["expert"] if s["code"] in _KEEP_EXPERT]
 QUESTIONNAIRES = STUDY["questionnaires"]
 
 # ------------------ TRANSLATION HELPERS --------------------
@@ -273,6 +328,53 @@ def build_llm_prompt_for_scenario(
         SEPARATOR=separator
     )
     return prompt
+
+# ------------------ FIXTURE LOADING -------------------------
+
+def load_scenario_fixtures(
+    scenario: Dict[str, Any],
+    lang: str = "en",
+) -> List[Any]:
+    """Load test fixtures from study_set_enriched.json for a scenario.
+
+    Converts the JSON fixture definitions into TestFixture objects
+    from execution_sandbox. Falls back to build_default_fixtures
+    if no fixtures are defined.
+
+    Args:
+        scenario: scenario dict from study set (with optional test_fixtures field)
+        lang: language for fixture descriptions
+
+    Returns:
+        List of TestFixture objects ready for run_test_suite()
+    """
+    from code_parsing.execution_sandbox import TestFixture, build_default_fixtures
+
+    raw_fixtures = scenario.get("test_fixtures", [])
+    if not raw_fixtures:
+        # Fallback to auto-generated default fixtures
+        return build_default_fixtures(
+            scenario.get("trigger_apis", []),
+            scenario.get("action_apis", []),
+            TRIGGER_INDEX,
+            ACTION_INDEX,
+        )
+
+    fixtures = []
+    desc_key = f"description_{lang}" if lang in ("en", "it") else "description_en"
+    for fx in raw_fixtures:
+        desc = fx.get(desc_key) or fx.get("description_en", fx.get("name", ""))
+        fixtures.append(TestFixture(
+            name=fx.get("name", "unnamed"),
+            description=desc,
+            getter_values=fx.get("getter_values", {}),
+            expect_skip=fx.get("expect_skip", []),
+            expect_fire=fx.get("expect_fire", []),
+            expect_setters=fx.get("expect_setters", {}),
+        ))
+
+    return fixtures
+
 
 # ------------------ PARSER / VALIDATION --------------------
 

@@ -5,7 +5,7 @@ Captures every interaction with timestamps, enabling:
 - Time-on-task analysis
 - Iteration count per scenario
 - Convergence tracking (how many turns to valid code)
-- Condition A/B comparison
+- Per-attempt analysis (T1 baseline vs T2-T3 iterative)
 """
 import json
 import time
@@ -14,7 +14,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 
-INTERACTION_LOG_PATH = Path("results/interaction_log.jsonl")
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+INTERACTION_LOG_PATH = _PROJECT_ROOT / "results" / "interaction_log.jsonl"
 INTERACTION_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
@@ -25,7 +26,7 @@ class InteractionLogger:
         self,
         user_id: str,
         scenario_code: str,
-        condition: str = "orchestrator",  # "single_shot" or "orchestrator"
+        condition: str = "orchestrator",
         user_type: str = "non_expert",
         log_path: Path = INTERACTION_LOG_PATH,
     ):

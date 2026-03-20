@@ -1,2 +1,11 @@
 [client]
 showSidebarNavigation = false
+
+[server]
+enableCORS = false
+enableXsrfProtection = false
+headless = true
+
+[theme]
+base = "light"
+primaryColor = "#3b82f6"

@@ -24,6 +24,9 @@ _KW = {
         "if_any": "SE (almeno una)",
         "guard_header": "Condizioni di blocco:",
         "default_header": "Configurazione azione:",
+        "api_warning_title": "Attenzione: dati non riconosciuti",
+        "api_warning_arrow": "dovrebbe essere",
+        "api_warning_no_match": "non riconosciuto dal servizio",
     },
     "en": {
         "IF": "IF", "ALWAYS": "ALWAYS", "THEN": "THEN",
@@ -33,6 +36,9 @@ _KW = {
         "if_any": "IF (any of)",
         "guard_header": "Blocking conditions:",
         "default_header": "Action setup:",
+        "api_warning_title": "Warning: unrecognized data",
+        "api_warning_arrow": "should be",
+        "api_warning_no_match": "not recognized by the service",
     },
 }
 
@@ -544,6 +550,62 @@ def _humanize_getter_refs(text: str, display_labels: Optional[dict]) -> str:
     return text
 
 
+def _split_top_level(text: str, keyword: str) -> List[str]:
+    """Split text by *keyword* only at the top level (outside parentheses).
+
+    >>> _split_top_level("A E (B O C)", "E")
+    ['A', '(B O C)']
+    """
+    parts: List[str] = []
+    depth = 0
+    current: List[str] = []
+    kw_pat = re.compile(rf'\s+{re.escape(keyword)}\s+')
+    i = 0
+    while i < len(text):
+        if text[i] == '(':
+            depth += 1
+            current.append('(')
+            i += 1
+        elif text[i] == ')':
+            depth = max(depth - 1, 0)
+            current.append(')')
+            i += 1
+        elif depth == 0:
+            m = kw_pat.match(text, i)
+            if m:
+                parts.append(''.join(current).strip())
+                current = []
+                i = m.end()
+                continue
+            current.append(text[i])
+            i += 1
+        else:
+            current.append(text[i])
+            i += 1
+    tail = ''.join(current).strip()
+    if tail:
+        parts.append(tail)
+    return parts if parts else [text]
+
+
+def _render_or_inline(clause: str, or_kw: str, lang: str) -> str:
+    """Render a single clause, keeping OR as styled inline pills."""
+    # Strip wrapping parens that might surround the whole clause
+    clause = _strip_outer_parens(clause.strip())
+    or_pat = re.compile(rf'\s+{re.escape(or_kw)}\s+')
+    or_parts = or_pat.split(clause)
+    if len(or_parts) <= 1:
+        return _render_with_ingredients(clause)
+    rendered = []
+    for j, part in enumerate(or_parts):
+        if j > 0:
+            rendered.append(
+                f' <span class="fc-or-kw">{_html.escape(or_kw)}</span> '
+            )
+        rendered.append(_render_with_ingredients(part.strip()))
+    return ''.join(rendered)
+
+
 def _format_condition(
     condition_text: str,
     user_type: str,
@@ -643,8 +705,14 @@ def _format_condition(
         text = text.replace("!", "NOT ")
 
         # 7. Clean up: strip redundant parens wrapping single tokens
+        #    BUT keep parens that contain OR (they're semantically meaningful grouping)
         text = re.sub(r'\((\xab[^\xbb]*\xbb)\)', r'\1', text)  # («label»)
-        text = re.sub(r'\(([^()]{1,60})\)', r'\1', text)      # (simple expr)
+        _or_kw_esc = re.escape(_kw(lang, "OR"))
+        text = re.sub(
+            r'\(([^()]{1,60})\)',
+            lambda m: m.group(0) if re.search(_or_kw_esc, m.group(1)) else m.group(1),
+            text,
+        )
         text = _strip_outer_parens(text.strip())
         text = re.sub(r'  +', ' ', text)
 
@@ -689,35 +757,137 @@ def _format_condition(
         if len(text) > max_len:
             text = text[:max_len - 3] + "..."
 
-        # 12. Convert to HTML: AND → bullet list, OR → styled pill
-        parts_split = re.split(split_pat, text)
-        # Separate AND clauses from OR
-        clauses = []
-        for part in parts_split:
-            stripped = part.strip()
-            if stripped == _and:
-                continue  # skip, we'll join with bullets
-            elif stripped == _or:
-                clauses.append(f' <span class="fc-or-kw">{_html.escape(_or)}</span> ')
-            else:
-                clauses.append(_render_with_ingredients(stripped))
-        if len(clauses) > 1 and all(not c.startswith(' <span') for c in clauses):
-            # Pure AND: render as numbered list, no indent
-            items = ''.join(f'<li>{c}</li>' for c in clauses)
-            return f'<ol class="fc-and-list">{items}</ol>'
-        return ''.join(clauses)
+        # 12. Convert to HTML: split by top-level AND → list items,
+        #     OR stays inline within each item.
+        and_clauses = _split_top_level(text, _and)
+        if len(and_clauses) > 1:
+            items = []
+            for clause in and_clauses:
+                rendered = _render_or_inline(clause, _or, lang)
+                items.append(f'<li>{rendered}</li>')
+            return f'<ol class="fc-and-list">{" ".join(items)}</ol>'
+        # Single clause (possibly with OR only)
+        return _render_or_inline(text, _or, lang)
 
     else:
-        # Expert: strip trigger namespace prefix from getter paths
+        # Expert: semi-technical display — readable but shows logic structure
+        # 0. Strip transparent JS methods and empty parens
+        text = _JS_STRIP_METHODS.sub('', text)
+        text = re.sub(r'\(\)', '', text)
+
+        # 1. Replace getter paths with human labels «...» (longest first)
+        labels = display_labels.get("getter_labels", {})
+        for key in sorted(labels, key=len, reverse=True):
+            if key in text:
+                text = text.replace(key, f'\xab{labels[key]}\xbb')
+
+        # 2. Strip trigger namespace prefixes for remaining raw paths
         for ns in display_labels.get("trigger_ns", set()):
-            # Replace "Namespace.xxx" with ".xxx"
             if ns + "." in text:
                 text = text.replace(ns + ".", ".")
 
-    if len(text) > max_len:
-        text = text[:max_len - 3] + "..."
+        # 3. Unwrap transparent functions
+        prev = None
+        while prev != text:
+            prev = text
+            for pat in _UNWRAP_PATTERNS:
+                text = pat.sub(r'\1', text)
 
-    return _html.escape(text)
+        # 4. Humanize validity guards
+        #    !isNaN(x) → "x is valid", isNaN(x) → "x is invalid"
+        #    x == undefined / x == null → "x is undefined"
+        text = re.sub(
+            r'!isNaN\(([^)]+)\)',
+            lambda m: f'{m.group(1)} is valid' if lang == "en" else f'{m.group(1)} valido',
+            text,
+        )
+        text = re.sub(
+            r'isNaN\(([^)]+)\)',
+            lambda m: f'{m.group(1)} is invalid' if lang == "en" else f'{m.group(1)} non valido',
+            text,
+        )
+        text = re.sub(
+            r'(\.\w+|\xab[^\xbb]*\xbb)\s*==\s*(?:undefined|null)',
+            lambda m: f'{m.group(1)} is undefined' if lang == "en" else f'{m.group(1)} non definito',
+            text,
+        )
+        text = re.sub(
+            r'(\.\w+|\xab[^\xbb]*\xbb)\s*!=\s*(?:undefined|null)',
+            lambda m: f'{m.group(1)} is defined' if lang == "en" else f'{m.group(1)} definito',
+            text,
+        )
+
+        # 5. Clean up parseFloat/parseInt wrappers
+        text = re.sub(r'parseFloat\(([^)]+)\)', r'\1', text)
+        text = re.sub(r'parseInt\(([^)]+)\)', r'\1', text)
+
+        # 6. Humanize operators for readability
+        text = text.replace("&&", " AND ")
+        text = text.replace("||", " OR ")
+        text = text.replace("!==", " != ")
+        text = text.replace("===", " == ")
+        text = re.sub(r'  +', ' ', text)
+
+        # 7. Strip redundant outer and inner parens
+        #    BUT keep parens that contain OR (semantically meaningful grouping)
+        text = _strip_outer_parens(text.strip())
+        # Remove parens wrapping «label» references
+        text = re.sub(r'\((\xab[^\xbb]*\xbb)\)', r'\1', text)
+        # Remove parens wrapping simple comparisons (no nested parens, no OR)
+        text = re.sub(
+            r'\(([^()]{1,80})\)',
+            lambda m: m.group(0) if ' OR ' in m.group(1) else m.group(1),
+            text,
+        )
+        text = _strip_outer_parens(text.strip())
+
+        # 8. Strip redundant validity guards that duplicate other conditions
+        #    e.g. "x < 500 AND x is defined AND x is valid" → "x < 500"
+        #    Only strip if the SAME variable also appears in a comparison
+        _and_parts = [_strip_outer_parens(p.strip().strip('()')) for p in re.split(r'\s+AND\s+', text)]
+        if len(_and_parts) > 1:
+            # Find variables that appear in comparisons (<, >, <=, >=, ==, !=)
+            _compared_vars = set()
+            _guard_indices = []
+            for _pi, _part in enumerate(_and_parts):
+                if re.search(r'[<>]=?\s', _part) or re.search(r'[!=]=\s', _part):
+                    # Extract variable references from comparison
+                    for _v in re.findall(r'(\.\w+|\xab[^\xbb]*\xbb)', _part):
+                        _compared_vars.add(_v)
+                elif re.search(r'(?:is (?:valid|defined|invalid|undefined)|(?:non )?valido|(?:non )?definito)$', _part):
+                    _guard_indices.append(_pi)
+            # Remove guards whose variable is already compared
+            _remove = set()
+            for _gi in _guard_indices:
+                _guard_var = re.search(r'(\.\w+|\xab[^\xbb]*\xbb)', _and_parts[_gi])
+                if _guard_var and _guard_var.group(1) in _compared_vars:
+                    _remove.add(_gi)
+            if _remove:
+                _and_parts = [p for i, p in enumerate(_and_parts) if i not in _remove]
+                text = ' AND '.join(_and_parts)
+
+        # 8b. Final parentheses cleanup after guard removal
+        text = _strip_outer_parens(text.strip())
+        # Iteratively strip inner parens (may have become unbalanced)
+        for _ in range(3):
+            _prev = text
+            text = re.sub(r'\(([^()]*)\)', r'\1', text)
+            text = text.strip()
+            if text == _prev:
+                break
+
+        # 9. Render: split by top-level AND → list items, OR inline.
+        text = text.strip()
+        _and_kw = "AND"
+        _or_kw = "OR"
+        and_clauses = _split_top_level(text, _and_kw)
+        if len(and_clauses) > 1:
+            items = []
+            for clause in and_clauses:
+                rendered = _render_or_inline(clause, _or_kw, lang)
+                items.append(f'<li>{rendered}</li>')
+            return f'<ol class="fc-and-list">{" ".join(items)}</ol>'
+        return _render_or_inline(text, _or_kw, lang)
 
 
 def _format_setter_field(
@@ -1781,3 +1951,566 @@ def render_code_flowchart_html(
         '</body></html>'
     )
     return (html, estimated_height)
+
+
+# ============================================================
+# BEHAVIORAL SUMMARY — natural-language card for non-experts
+# ============================================================
+
+def render_behavioral_summary_html(
+    outcomes_raw: List[Dict[str, Any]],
+    lang: str = "en",
+    display_labels: Optional[dict] = None,
+) -> str:
+    """Render L1 outcomes as a natural-language behavioral summary card.
+
+    Transforms each outcome path into a human-readable sentence like:
+      "SE «Temperatura minima di domani» < 2 → Blocca la notifica"
+      "ALTRIMENTI → Invia la notifica con messaggio: «Allerta gelo...»"
+
+    No JS identifiers, no code — purely behavioral descriptions.
+    Returns an HTML string suitable for st.markdown(unsafe_allow_html=True).
+    """
+    if not outcomes_raw:
+        return ""
+
+    kw_if = _kw(lang, "IF")
+    kw_always = _kw(lang, "ALWAYS")
+    kw_then = _kw(lang, "THEN")
+    kw_skip = _kw(lang, "skip")
+    otherwise = "ALTRIMENTI" if lang == "it" else "OTHERWISE"
+
+    lines: List[str] = []
+
+    for i, outcome in enumerate(outcomes_raw):
+        is_always = outcome.get("condition_is_always", False)
+        cond_text = outcome.get("condition", "")
+        has_skip = bool(outcome.get("skip_targets"))
+        setters = outcome.get("setters", [])
+
+        # --- Build condition phrase ---
+        if is_always:
+            # Check if this is the only path or a fallback
+            if i == 0 and len(outcomes_raw) == 1:
+                cond_phrase = f"<b>{kw_always}</b>"
+            else:
+                cond_phrase = f"<b>{otherwise}</b>"
+        else:
+            formatted_cond = _format_condition(
+                cond_text, "non_expert", display_labels, lang,
+            )
+            cond_phrase = f"<b>{kw_if}</b> {formatted_cond}"
+
+        # --- Build action phrase ---
+        action_parts: List[str] = []
+
+        if has_skip:
+            targets = outcome.get("skip_targets", [])
+            for t in targets:
+                name = ""
+                if display_labels:
+                    name = display_labels.get("skip_labels", {}).get(t)
+                    if not name:
+                        name = display_labels.get("namespace_names", {}).get(t, t)
+                else:
+                    name = t
+                icon = _ns_icon_html(t, display_labels, size=16) if display_labels else ""
+                block_word = "Blocca" if lang == "it" else "Block"
+                action_parts.append(f"{icon}<b>{block_word}</b> {_html.escape(name)}")
+
+        if setters:
+            for s in setters:
+                method = s.get("method", "")
+                value = s.get("value")
+
+                # Resolve action name
+                action_name = ""
+                if display_labels:
+                    for ns in display_labels.get("action_ns", set()):
+                        if method.startswith(ns + ".") or method == ns:
+                            action_name = display_labels.get(
+                                "namespace_names", {}
+                            ).get(ns, "")
+                            break
+
+                # Resolve field label
+                field_label = ""
+                if display_labels:
+                    field_label = display_labels.get("setter_labels", {}).get(method, "")
+                if not field_label:
+                    parts = method.split(".")
+                    raw = parts[-1] if parts else method
+                    raw = re.sub(r'([a-z])([A-Z])', r'\1 \2', raw)
+                    if raw.lower().startswith("set"):
+                        raw = raw[3:].strip()
+                    field_label = raw.title() if raw else method
+
+                # Format value
+                val_text = ""
+                if value and value != "None":
+                    val = value.strip("'\"")
+                    if display_labels:
+                        val = _humanize_getter_refs(val, display_labels)
+                    val_text = f': \xab{val}\xbb'
+
+                icon = _ns_icon_html(
+                    method.rsplit(".", 1)[0] if "." in method else method,
+                    display_labels, size=16,
+                ) if display_labels else ""
+
+                send_word = "Invia" if lang == "it" else "Send"
+                set_word = "imposta" if lang == "it" else "set"
+
+                if action_name and val_text:
+                    action_parts.append(
+                        f"{icon}<b>{_html.escape(action_name)}</b> — "
+                        f"{set_word} {_html.escape(field_label)}{val_text}"
+                    )
+                elif action_name:
+                    action_parts.append(
+                        f"{icon}<b>{_html.escape(action_name)}</b>"
+                    )
+                else:
+                    action_parts.append(
+                        f"{set_word} {_html.escape(field_label)}{val_text}"
+                    )
+
+        if not action_parts:
+            no_action = "nessuna azione" if lang == "it" else "no action"
+            action_parts.append(f"<i>{no_action}</i>")
+
+        action_phrase = "; ".join(action_parts)
+
+        arrow = " → "
+        lines.append(f"{cond_phrase}{arrow}{action_phrase}")
+
+    # Build card HTML
+    title = "Cosa fa questa automazione" if lang == "it" else "What this automation does"
+    items_html = "".join(
+        f'<div style="padding:6px 0;border-bottom:1px solid #f0f0f0;">{line}</div>'
+        for line in lines
+    )
+
+    return (
+        f'<div style="border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;'
+        f'margin:8px 0;">'
+        f'<div style="background:#e8f5e9;padding:8px 14px;font-weight:700;'
+        f'font-size:0.95em;color:#2e7d32;">{_html.escape(title)}</div>'
+        f'<div style="padding:10px 14px;font-size:0.9em;line-height:1.6;">'
+        f'{items_html}</div></div>'
+    )
+
+
+# ============================================================
+# BEHAVIOR FLOW — Hybrid visual (F-style)
+# ============================================================
+
+_BF_CSS = """\
+<style>
+.bf-trigger{display:flex;align-items:center;gap:10px;padding:10px 18px;border-radius:12px;
+  background:#f8f9fa;border:1px solid #e0e0e0;font-size:0.88rem;font-weight:600;margin-bottom:14px}
+.bf-trigger .bf-svc-icon{width:26px;height:26px;border-radius:6px;object-fit:contain;padding:3px;flex-shrink:0}
+.bf-trigger .bf-t-name{color:#333}
+.bf-trigger .bf-t-label{color:#666;font-weight:400}
+.bf-lanes{display:flex;flex-direction:column;gap:8px}
+.bf-lane{display:flex;align-items:stretch;gap:0;border-radius:12px;overflow:hidden;
+  box-shadow:0 1px 5px rgba(0,0,0,.06);border:1px solid #eee}
+.bf-lane-cond{flex:0 0 220px;padding:12px 14px;background:#fafafa;
+  display:flex;align-items:center;gap:8px;border-right:1px solid #eee}
+.bf-cond-icon{width:22px;height:22px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:.72rem;color:#fff;font-weight:700}
+.bf-cond-icon.yes{background:#43a047}.bf-cond-icon.no{background:#e53935}.bf-cond-icon.partial{background:#f9a825}
+.bf-cond-text{display:flex;flex-direction:column;gap:2px;flex:1}
+.bf-cond-label{font-size:.65rem;text-transform:uppercase;letter-spacing:.5px;color:#999;font-weight:700}
+.bf-cond-value{font-size:.84rem;color:#444;line-height:1.3}
+.bf-lane-arrow{display:flex;align-items:center;justify-content:center;padding:0 4px;
+  color:#bbb;font-size:1.1rem;flex-shrink:0;background:#fafafa}
+.bf-lane-out{flex:1;padding:10px 14px;display:flex;flex-wrap:wrap;align-items:center;gap:6px;align-content:center}
+.bf-lane.exec-bg .bf-lane-out{background:#f6fbf6}
+.bf-lane.block-bg .bf-lane-out{background:#fef7f7}
+.bf-lane.mixed-bg .bf-lane-out{background:#fffdf5}
+.bf-chip{display:inline-flex;flex-direction:column;gap:2px;padding:7px 12px;border-radius:10px;font-size:.82rem;font-weight:600}
+.bf-chip.exec{background:#e8f5e9;border:1px solid #a5d6a7;color:#2e7d32}
+.bf-chip.block{background:#ffebee;border:1px solid #ef9a9a;color:#c62828}
+.bf-chip .bf-chip-name{display:flex;align-items:center;gap:5px}
+.bf-chip .bf-svc-icon{width:20px;height:20px;border-radius:5px;object-fit:contain;padding:2px}
+.bf-chip .bf-chip-detail{font-weight:400;font-size:.72rem;color:#777;padding-left:25px}
+.bf-mini-badge{font-size:.58rem;font-weight:700;padding:1px 5px;border-radius:3px;
+  text-transform:uppercase;letter-spacing:.3px}
+.bf-mini-badge.exec{background:#43a047;color:#fff}
+.bf-mini-badge.skip{background:#e53935;color:#fff}
+</style>
+"""
+
+
+def _bf_svc_icon_html(
+    ns_key: str,
+    display_labels: Optional[dict],
+    size: int = 20,
+    css_class: str = "bf-svc-icon",
+) -> str:
+    """Service icon <img> with brand_color background for contrast."""
+    if not display_labels:
+        return ""
+    icon_url = display_labels.get("namespace_icons", {}).get(ns_key, "")
+    if not icon_url:
+        return ""
+    bg = display_labels.get("namespace_colors", {}).get(ns_key, "#555")
+    return (
+        f'<img class="{css_class}" src="{_html.escape(icon_url)}" alt="" '
+        f'style="background:{_html.escape(bg)};">'
+    )
+
+
+def _bf_find_trigger_ns(display_labels: Optional[dict]) -> str:
+    """Return the first trigger namespace (for the trigger banner)."""
+    if not display_labels:
+        return ""
+    t_ns = display_labels.get("trigger_ns", set())
+    return next(iter(t_ns), "")
+
+
+def render_behavior_flow_html(
+    outcomes_raw: List[Dict[str, Any]],
+    lang: str = "en",
+    user_type: str = "non_expert",
+    display_labels: Optional[dict] = None,
+) -> str:
+    """Render L1 outcomes as a hybrid behavior-flow visual.
+
+    Produces the F-style layout: trigger banner with service icon,
+    then lanes with condition icons, arrows, and action chips.
+    """
+    if not outcomes_raw:
+        return ""
+
+    e = _html.escape
+    kw_if = _kw(lang, "IF")
+    kw_always = _kw(lang, "ALWAYS")
+    otherwise = "ALTRIMENTI" if lang == "it" else "OTHERWISE"
+    when_label = "Quando" if lang == "it" else "When"
+    always_label = "Sempre" if lang == "it" else "Always"
+    otherwise_label = "Altrimenti" if lang == "it" else "Otherwise"
+    exec_word = "esegue" if lang == "it" else "runs"
+    block_word = "bloccata" if lang == "it" else "blocked"
+
+    # --- Trigger banner ---
+    trigger_ns = _bf_find_trigger_ns(display_labels)
+    trigger_name = ""
+    trigger_detail = ""
+    trigger_icon_html = ""
+    if trigger_ns and display_labels:
+        trigger_name = display_labels.get("namespace_names", {}).get(trigger_ns, "")
+        trigger_icon_html = _bf_svc_icon_html(trigger_ns, display_labels, size=26, css_class="bf-svc-icon")
+        # Extract trigger description from name (typically "Action name" of the trigger)
+        trigger_detail = trigger_name
+
+    trigger_html = ""
+    if trigger_name or trigger_icon_html:
+        trigger_html = (
+            f'<div class="bf-trigger">'
+            f'{trigger_icon_html}'
+            f'<span><span class="bf-t-name">{e(trigger_name)}</span></span>'
+            f'</div>'
+        )
+
+    # --- Lanes ---
+    lanes_html_parts = []
+
+    for i, outcome in enumerate(outcomes_raw):
+        is_always = outcome.get("condition_is_always", False)
+        cond_text = outcome.get("condition", "")
+        has_skip = bool(outcome.get("skip_targets"))
+        skip_targets = outcome.get("skip_targets", [])
+        setters = outcome.get("setters", [])
+
+        # Determine lane type for background
+        has_exec = bool(setters)
+        has_block = has_skip
+        if has_exec and has_block:
+            lane_bg = "mixed-bg"
+            cond_icon_cls = "partial"
+            cond_icon_char = "!"
+        elif has_block:
+            lane_bg = "block-bg"
+            cond_icon_cls = "no"
+            cond_icon_char = "✕"
+        else:
+            lane_bg = "exec-bg"
+            cond_icon_cls = "yes"
+            cond_icon_char = "✓"
+
+        # Condition text
+        if is_always:
+            if i == 0 and len(outcomes_raw) == 1:
+                cond_label = always_label
+                cond_value = ""
+            else:
+                cond_label = otherwise_label
+                cond_value = ""
+        else:
+            cond_label = when_label
+            cond_value = _format_condition(
+                cond_text, user_type, display_labels, lang,
+            )
+
+        # Build action chips
+        chips_html = []
+
+        # Skip targets → blocked chips
+        for target in skip_targets:
+            name = ""
+            if display_labels:
+                name = display_labels.get("skip_labels", {}).get(target)
+                if not name:
+                    name = display_labels.get("namespace_names", {}).get(target, target)
+            else:
+                name = target
+            icon = _bf_svc_icon_html(target, display_labels, size=20, css_class="bf-svc-icon")
+            chips_html.append(
+                f'<div class="bf-chip block">'
+                f'<div class="bf-chip-name">{icon} {e(name)} '
+                f'<span class="bf-mini-badge skip">{e(block_word)}</span></div>'
+                f'</div>'
+            )
+
+        # Setters → exec chips
+        for s in setters:
+            method = s.get("method", "")
+            value = s.get("value")
+
+            # Resolve action name
+            action_name = method
+            action_ns_key = ""
+            if display_labels:
+                for ns in display_labels.get("action_ns", set()):
+                    if method.startswith(ns + ".") or method == ns:
+                        action_name = display_labels.get("namespace_names", {}).get(ns, method)
+                        action_ns_key = ns
+                        break
+
+            # Resolve field label + value
+            detail_text = ""
+            if display_labels:
+                field_label = display_labels.get("setter_labels", {}).get(method, "")
+                if not field_label:
+                    parts = method.split(".")
+                    raw = parts[-1] if parts else method
+                    raw = re.sub(r'([a-z])([A-Z])', r'\1 \2', raw)
+                    if raw.lower().startswith("set"):
+                        raw = raw[3:].strip()
+                    field_label = raw.title() if raw else ""
+                if value and value != "None":
+                    val = value.strip("'\"")
+                    val = _humanize_getter_refs(val, display_labels)
+                    if field_label:
+                        detail_text = f"{field_label}: \xab{val}\xbb"
+                    else:
+                        detail_text = f"\xab{val}\xbb"
+                elif field_label:
+                    detail_text = field_label
+            elif value and value != "None":
+                detail_text = e(value[:80])
+
+            icon = _bf_svc_icon_html(action_ns_key or method.rsplit(".", 1)[0], display_labels, size=20, css_class="bf-svc-icon")
+            detail_html = f'<div class="bf-chip-detail">{detail_text}</div>' if detail_text else ""
+            chips_html.append(
+                f'<div class="bf-chip exec">'
+                f'<div class="bf-chip-name">{icon} {e(action_name)} '
+                f'<span class="bf-mini-badge exec">{e(exec_word)}</span></div>'
+                f'{detail_html}'
+                f'</div>'
+            )
+
+        cond_value_html = f'<span class="bf-cond-value">{cond_value}</span>' if cond_value else ""
+        lane_html = (
+            f'<div class="bf-lane {lane_bg}">'
+            f'<div class="bf-lane-cond">'
+            f'<div class="bf-cond-icon {cond_icon_cls}">{cond_icon_char}</div>'
+            f'<div class="bf-cond-text">'
+            f'<span class="bf-cond-label">{e(cond_label)}</span>'
+            f'{cond_value_html}'
+            f'</div></div>'
+            f'<div class="bf-lane-arrow">\u2192</div>'
+            f'<div class="bf-lane-out">{"".join(chips_html)}</div>'
+            f'</div>'
+        )
+        lanes_html_parts.append(lane_html)
+
+    return (
+        f'{_BF_CSS}'
+        f'{trigger_html}'
+        f'<div class="bf-lanes">{"".join(lanes_html_parts)}</div>'
+    )
+
+
+def render_test_results_nonexpert(
+    test_results: list,
+    lang: str = "en",
+) -> str:
+    """Render sandbox test results as natural-language factual scenarios.
+
+    Shows WHAT HAPPENS (not whether it's right or wrong).
+    The pass/fail is hidden from the non-expert user.
+
+    Each fixture becomes a sentence like:
+      "Scenario: temperatura minima 28°F → La notifica viene bloccata"
+
+    Returns HTML for st.markdown(unsafe_allow_html=True).
+    """
+    if not test_results:
+        return ""
+
+    title = "Scenari di test" if lang == "it" else "Test scenarios"
+
+    items: List[str] = []
+    for tr in test_results:
+        # tr is a TestResult from execution_sandbox
+        desc = getattr(tr, "fixture_name", "") or "?"
+
+        exec_result = getattr(tr, "execution", None)
+        if exec_result is None:
+            continue
+
+        fired = getattr(exec_result, "actions_fired", [])
+        skipped = getattr(exec_result, "actions_skipped", [])
+        setters = getattr(exec_result, "setters_called", [])
+
+        parts: List[str] = []
+
+        if skipped:
+            for sk in skipped:
+                block_word = "viene bloccato/a" if lang == "it" else "is blocked"
+                parts.append(f"<b>{_html.escape(sk)}</b> {block_word}")
+
+        if fired:
+            for f in fired:
+                fire_word = "viene eseguito/a" if lang == "it" else "is executed"
+                # Check if there are setters for this action
+                action_setters = [
+                    s for s in setters
+                    if getattr(s, "method", "").startswith(f + ".")
+                ]
+                if action_setters:
+                    set_details = []
+                    for s in action_setters:
+                        val = getattr(s, "value", "")
+                        meth = getattr(s, "method", "").split(".")[-1]
+                        meth_clean = re.sub(r'([a-z])([A-Z])', r'\1 \2', meth)
+                        if meth_clean.lower().startswith("set"):
+                            meth_clean = meth_clean[3:].strip()
+                        if val:
+                            set_details.append(
+                                f'{meth_clean.lower()}: \xab{_html.escape(str(val))}\xbb'
+                            )
+                    if set_details:
+                        with_word = "con" if lang == "it" else "with"
+                        parts.append(
+                            f"<b>{_html.escape(f)}</b> {fire_word} "
+                            f"{with_word} {', '.join(set_details)}"
+                        )
+                    else:
+                        parts.append(f"<b>{_html.escape(f)}</b> {fire_word}")
+                else:
+                    parts.append(f"<b>{_html.escape(f)}</b> {fire_word}")
+
+        if not parts:
+            no_action = "nessuna azione eseguita" if lang == "it" else "no action executed"
+            parts.append(f"<i>{no_action}</i>")
+
+        scenario_word = "Scenario" if lang == "it" else "Scenario"
+        result_text = "; ".join(parts)
+        items.append(
+            f'<div style="padding:6px 0;border-bottom:1px solid #f0f0f0;">'
+            f'<b>{scenario_word}: {_html.escape(desc)}</b><br>'
+            f'{result_text}</div>'
+        )
+
+    return (
+        f'<div style="border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;'
+        f'margin:8px 0;">'
+        f'<div style="background:#e3f2fd;padding:8px 14px;font-weight:700;'
+        f'font-size:0.95em;color:#1565c0;">{_html.escape(title)}</div>'
+        f'<div style="padding:10px 14px;font-size:0.9em;line-height:1.6;">'
+        f'{"".join(items)}</div></div>'
+    )
+
+
+# ============================================================
+# API WARNING BLOCK — invalid getters/setters
+# ============================================================
+
+def _camelcase_to_words(identifier: str) -> str:
+    """Convert a CamelCase identifier to space-separated words.
+
+    Takes the last segment after '.' and strips 'set' prefix from setters.
+    Example: 'Weather.tomorrowsWeatherAtTime.MinTemperatureCelsius'
+             → 'Min Temperature Celsius'
+    """
+    # Take last segment after '.'
+    name = identifier.rsplit(".", 1)[-1]
+    # Strip 'set' prefix (setter convention)
+    if name.startswith("set") and len(name) > 3 and name[3].isupper():
+        name = name[3:]
+    # Split CamelCase: insert space before each uppercase letter
+    words = re.sub(r'([a-z0-9])([A-Z])', r'\1 \2', name)
+    # Also split sequences like 'HTMLParser' → 'HTML Parser'
+    words = re.sub(r'([A-Z]+)([A-Z][a-z])', r'\1 \2', words)
+    return words
+
+
+def render_api_warning_html(
+    api_fixes: List[Dict[str, str]],
+    lang: str = "en",
+    user_type: str = "non_expert",
+) -> str:
+    """Render an HTML warning block for invalid getters/setters.
+
+    Returns '' if api_fixes is empty.
+    """
+    if not api_fixes:
+        return ""
+
+    title = _kw(lang, "api_warning_title")
+    arrow_word = _kw(lang, "api_warning_arrow")
+    no_match = _kw(lang, "api_warning_no_match")
+
+    rows: List[str] = []
+    for fix in api_fixes:
+        human_invalid = _camelcase_to_words(fix["invalid"])
+        if fix.get("suggestion"):
+            human_suggestion = fix.get("label") or _camelcase_to_words(fix["suggestion"])
+            row_main = (
+                f'<b>{_html.escape(human_invalid)}</b> '
+                f'→ {arrow_word} <b>{_html.escape(human_suggestion)}</b>'
+            )
+        else:
+            row_main = (
+                f'<b>{_html.escape(human_invalid)}</b> — '
+                f'<i>{no_match}</i>'
+            )
+
+        # Expert: add raw path in small text underneath
+        if user_type == "expert":
+            raw_line = f'<code>{_html.escape(fix["invalid"])}</code>'
+            if fix.get("suggestion"):
+                raw_line += f' → <code>{_html.escape(fix["suggestion"])}</code>'
+            row_main += (
+                f'<br><span style="font-size:0.78em;color:#888;">'
+                f'{raw_line}</span>'
+            )
+
+        rows.append(
+            f'<div style="padding:4px 0;border-bottom:1px solid #fff3c4;">'
+            f'{row_main}</div>'
+        )
+
+    return (
+        f'<div style="border:1px solid #f9a825;border-radius:10px;overflow:hidden;'
+        f'margin:8px 0;">'
+        f'<div style="background:#fff8e1;padding:8px 14px;font-weight:700;'
+        f'font-size:0.95em;color:#f57f17;">'
+        f'\u26a0\ufe0f {_html.escape(title)}</div>'
+        f'<div style="padding:10px 14px;font-size:0.9em;line-height:1.6;">'
+        f'{"".join(rows)}</div></div>'
+    )

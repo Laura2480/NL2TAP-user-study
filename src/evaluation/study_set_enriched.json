@@ -53,7 +53,7 @@
     {
       "code": "S1",
       "row_index": 44,
-      "complexity_tag": "simple_skip",
+      "complexity_tag": "C1",
       "services": [
         "weather",
         "if_notifications"
@@ -364,7 +364,7 @@
                   "name": "La condizione di domani",
                   "description": "La situazione meteorologica attuale.",
                   "slug": "tomorrows_condition",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "Soleggiato",
                   "filter_code_key": "Weather.tomorrowsWeatherAtTime.TomorrowsCondition"
                 },
@@ -380,7 +380,7 @@
                   "name": "Temperatura massima (Fahrenheit)",
                   "description": "La temperatura massima di domani è espressa in gradi Fahrenheit",
                   "slug": "high_temp_fahrenheit",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "72",
                   "filter_code_key": "Weather.tomorrowsWeatherAtTime.HighTempFahrenheit"
                 },
@@ -388,7 +388,7 @@
                   "name": "Temperatura massima (Celsius)",
                   "description": "La temperatura massima di domani in gradi Celsius",
                   "slug": "high_temp_celsius",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "18",
                   "filter_code_key": "Weather.tomorrowsWeatherAtTime.HighTempCelsius"
                 },
@@ -396,15 +396,15 @@
                   "name": "Temperatura minima (Fahrenheit)",
                   "description": "La minima temperatura di domani in gradi Fahrenheit",
                   "slug": "low_temp_fahrenheit",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "72",
                   "filter_code_key": "Weather.tomorrowsWeatherAtTime.LowTempFahrenheit"
                 },
                 {
-                  "name": "Bassa temperatura Celsius",
+                  "name": "Temperatura minima Celsius",
                   "description": "La minima temperatura di domani in gradi Celsius",
                   "slug": "low_temp_celsius",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "18",
                   "filter_code_key": "Weather.tomorrowsWeatherAtTime.LowTempCelsius"
                 },
@@ -455,130 +455,132 @@
             }
           ]
         }
-      }
+      },
+      "test_fixtures": [
+        {
+          "name": "cold_night",
+          "description_en": "Tomorrow's low is below freezing (28°F)",
+          "description_it": "La minima di domani è sotto zero (28°F / -2°C)",
+          "getter_values": {
+            "Weather.tomorrowsWeatherAtTime.TomorrowsLowTempFahrenheit": "28",
+            "Weather.tomorrowsWeatherAtTime.TomorrowsLowTempCelsius": "-2"
+          },
+          "expect_skip": [],
+          "expect_fire": [
+            "IfNotifications.sendNotification"
+          ],
+          "expect_setters": {}
+        },
+        {
+          "name": "warm_night",
+          "description_en": "Tomorrow's low is well above freezing (55°F)",
+          "description_it": "La minima di domani è ben sopra zero (55°F / 13°C)",
+          "getter_values": {
+            "Weather.tomorrowsWeatherAtTime.TomorrowsLowTempFahrenheit": "55",
+            "Weather.tomorrowsWeatherAtTime.TomorrowsLowTempCelsius": "13"
+          },
+          "expect_skip": [
+            "IfNotifications.sendNotification"
+          ],
+          "expect_fire": [],
+          "expect_setters": {}
+        }
+      ]
     },
     {
       "code": "S2",
-      "row_index": 254,
-      "complexity_tag": "simple_no_skip",
+      "row_index": -1,
+      "complexity_tag": "C1",
       "services": [
-        "date_and_time",
-        "if_notifications"
+        "email",
+        "google_calendar"
       ],
       "trigger_apis": [
-        "date_and_time.every_hour_at"
+        "email.send_ifttt_an_email"
       ],
       "action_apis": [
-        "if_notifications.send_notification"
+        "google_calendar.quick_add_event"
       ],
-      "title_en": "Hourly drink-water reminder",
-      "title_it": "Promemoria orario per bere acqua",
-      "background_en": "Inside an active time window, you want periodic reminders to drink water.",
-      "background_it": "All’interno di una fascia oraria attiva vuoi promemoria periodici per bere acqua.",
-      "if_then_en": "IF current time is between start and end THEN send a water reminder every N hours.",
-      "if_then_it": "SE l’ora corrente è tra inizio e fine ALLORA invia un promemoria per bere ogni N ore.",
+      "title_en": "Auto-create calendar events from emails",
+      "title_it": "Crea eventi nel calendario dalle email",
+      "background_en": "You often receive emails about meetings and want them automatically added to your calendar, but only when the subject actually mentions a meeting.",
+      "background_it": "Ricevi spesso email su riunioni e vuoi che vengano aggiunte automaticamente al calendario, ma solo quando l’oggetto menziona effettivamente una riunione.",
+      "if_then_en": "IF you receive an email AND the subject contains ‘meeting’ THEN create a calendar event with the subject as event text.",
+      "if_then_it": "SE ricevi un’email E l’oggetto contiene ‘riunione’ ALLORA crea un evento nel calendario con l’oggetto come testo dell’evento.",
       "trigger_options": [
         {
-          "id": "start_time",
-          "label_en": "Start time",
-          "label_it": "Ora di inizio",
-          "description_en": "Time when reminders should start.",
-          "description_it": "Ora a partire dalla quale iniziano i promemoria.",
+          "id": "keyword",
+          "label_en": "Keyword in subject",
+          "label_it": "Parola chiave nell’oggetto",
+          "description_en": "Word that must appear in the email subject to trigger the calendar event.",
+          "description_it": "Parola che deve comparire nell’oggetto dell’email per creare l’evento.",
           "example_values_en": [
-            "09:00",
-            "08:30"
+            "meeting",
+            "sync",
+            "standup"
           ],
           "example_values_it": [
-            "09:00",
-            "08:30"
-          ]
-        },
-        {
-          "id": "end_time",
-          "label_en": "End time",
-          "label_it": "Ora di fine",
-          "description_en": "Time when reminders should stop.",
-          "description_it": "Ora alla quale i promemoria devono fermarsi.",
-          "example_values_en": [
-            "17:00",
-            "18:00",
-            "21:00"
-          ],
-          "example_values_it": [
-            "17:00",
-            "18:00",
-            "21:00"
-          ]
-        },
-        {
-          "id": "frequency_hours",
-          "label_en": "Reminder frequency (hours)",
-          "label_it": "Frequenza promemoria (ore)",
-          "description_en": "Time between reminders.",
-          "description_it": "Intervallo di tempo tra un promemoria e l’altro.",
-          "example_values_en": [
-            "1",
-            "2"
-          ],
-          "example_values_it": [
-            "1",
-            "2"
+            "riunione",
+            "meeting",
+            "standup"
           ]
         }
       ],
       "action_options": [
         {
-          "id": "message_text",
-          "label_en": "Reminder message",
-          "label_it": "Testo del promemoria",
-          "description_en": "Friendly text to encourage hydration.",
-          "description_it": "Testo gentile per incoraggiare l’idratazione.",
+          "id": "event_text",
+          "label_en": "Calendar event text",
+          "label_it": "Testo dell’evento",
+          "description_en": "What the calendar event should say (can include the email subject).",
+          "description_it": "Cosa deve riportare l’evento nel calendario (può includere l’oggetto dell’email).",
           "example_values_en": [
-            "Time to drink a glass of water 💧",
-            "Hydration check: have a sip!"
+            "Meeting: [email subject]",
+            "[email subject] — from [sender]"
           ],
           "example_values_it": [
-            "È ora di bere un bicchiere d’acqua 💧",
-            "Check idratazione: bevi qualche sorso!"
+            "Riunione: [oggetto email]",
+            "[oggetto email] — da [mittente]"
           ]
         }
       ],
       "intent_examples_en": [
-        "Remind me every hour from 9 to 18 to drink water."
+        "When I get an email with ‘meeting’ in the subject, add it to my calendar.",
+        "Create a calendar event from any email whose subject contains ‘meeting’."
       ],
       "intent_examples_it": [
-        "Ricordami ogni ora dalle 9 alle 18 di bere acqua."
+        "Quando ricevo un’email con ‘riunione’ nell’oggetto, aggiungila al calendario.",
+        "Crea un evento nel calendario per ogni email il cui oggetto contiene ‘riunione’."
       ],
       "catalog": {
         "en": {
           "services": [
             {
-              "service_slug": "date_and_time",
-              "name": "Date & Time",
-              "brand_color": "#333333",
-              "image_url": "https://assets.ifttt.com/images/channels/3/icons/monochrome_regular.webp",
-              "category": "Project management & to-dos",
+              "service_slug": "email",
+              "name": "Email",
+              "brand_color": "#2468ff",
+              "image_url": "https://assets.ifttt.com/images/channels/6/icons/monochrome_regular.webp",
+              "category": "Business tools",
               "tags": "popular",
               "triggers": [],
               "actions": [],
-              "title": "Automate your Date & Time integrations",
-              "description": "With IFTTT and the Date & Time service, you can automate tasks based on specific time intervals, ensuring your routines run smoothly. Set triggers to execute actions daily, weekly, monthly, or yearly, all aligned with your time zone.",
+              "title": "Automate your Email integrations",
+              "description": "Automate your email communication with IFTTT! With the Email service, you can send and receive vital information effortlessly, ensuring you never miss important updates.",
               "exists": true,
               "legacy": false,
               "alias_used": null,
               "http_status": 200
             },
             {
-              "service_slug": "if_notifications",
-              "name": "Notifications",
-              "brand_color": "#0099ff",
-              "image_url": "https://assets.ifttt.com/images/channels/651849913/icons/monochrome_regular.webp",
-              "category": "Mobile devices & accessories",
+              "service_slug": "google_calendar",
+              "name": "Google Calendar",
+              "brand_color": "#2C6EFC",
+              "image_url": "https://assets.ifttt.com/images/channels/1396293310/icons/monochrome_regular.webp",
+              "category": "Business tools",
               "tags": "popular",
               "triggers": [],
               "actions": [],
-              "title": "Automate your Notifications integrations",
-              "description": "With the IFTTT Notifications service, you can receive timely updates on your Android or iOS device. Whether it's daily weather forecasts or alerts for significant events, this integration keeps you informed with customizable notifications sent directly from the IFTTT app.",
+              "title": "Automate your Google Calendar integrations",
+              "description": "IFTTT allows you to seamlessly integrate Google Calendar with other apps and devices, enabling you to automate event creation, manage your schedule, and receive custom notifications effortlessly.",
               "exists": true,
               "legacy": false,
               "alias_used": null,
@@ -587,102 +589,105 @@
           ],
           "triggers": [
             {
-              "service_slug": "date_and_time",
-              "module_name": "every_hour_at",
-              "name": "Every hour at",
-              "description": "This Trigger fires once an hour at :00, :15, :30, or :45 minutes past the hour.",
-              "api_endpoint_slug": "date_and_time.every_hour_at",
+              "service_slug": "email",
+              "module_name": "send_ifttt_an_email",
+              "name": "Send IFTTT any email",
+              "description": "Send IFTTT any email at trigger@applet.ifttt.com and this Trigger fires. You can optionally add a single file attachment and IFTTT will create a public URL to the file as an Ingredient.",
+              "api_endpoint_slug": "email.send_ifttt_an_email",
               "runtime_method": null,
               "skip_method": null,
-              "fields": [
-                {
-                  "label": "Minutes past the hour",
-                  "slug": "time",
-                  "input_type_family": "Text input",
-                  "input_type_sub": null,
-                  "required": true,
-                  "can_have_default": true,
-                  "helper_text": null,
-                  "filter_code_method": null
-                }
-              ],
+              "fields": [],
               "ingredients": [
                 {
-                  "name": "Check time",
-                  "description": "Date and time this trigger was checked.",
-                  "slug": "CheckTime",
+                  "name": "Subject",
+                  "description": "Email subject line.",
+                  "slug": "Subject",
+                  "dtype": "String",
+                  "example": "Hello there",
+                  "filter_code_key": "Email.sendIftttAnEmail.Subject"
+                },
+                {
+                  "name": "From",
+                  "description": "Email address of sender.",
+                  "slug": "From",
+                  "dtype": "String",
+                  "example": "somebody@gmail.com",
+                  "filter_code_key": "Email.sendIftttAnEmail.From"
+                },
+                {
+                  "name": "Body",
+                  "description": "Email body, with most signatures stripped out.",
+                  "slug": "Body",
+                  "dtype": "String",
+                  "example": "Been having a good day so far...",
+                  "filter_code_key": "Email.sendIftttAnEmail.Body"
+                },
+                {
+                  "name": "Received at",
+                  "description": "Date and time email was received.",
+                  "slug": "ReceivedAt",
                   "dtype": "String",
                   "example": "August 23, 2010 at 11:01PM",
-                  "filter_code_key": "DateAndTime.everyHourAt.CheckTime"
+                  "filter_code_key": "Email.sendIftttAnEmail.ReceivedAt"
                 }
               ],
-              "namespace": "DateAndTime.everyHourAt"
+              "namespace": "Email.sendIftttAnEmail"
             }
           ],
           "actions": [
             {
-              "service_slug": "if_notifications",
-              "module_name": "send_notification",
-              "name": "Send a notification from the IFTTT app",
-              "description": "This action will send a notification to your devices from the IFTTT app.",
-              "api_endpoint_slug": "if_notifications.send_notification",
-              "runtime_method": "runAction(\"if_notifications.send_notification\", {})",
-              "skip_method": "IfNotifications.sendNotification.skip(string?: reason)",
+              "service_slug": "google_calendar",
+              "module_name": "quick_add_event",
+              "name": "Quick add event",
+              "description": "This Action will add an event to your Google Calendar. Simply include a detailed description of when and what.",
+              "api_endpoint_slug": "google_calendar.quick_add_event",
+              "runtime_method": "runAction(\"google_calendar.quick_add_event\", {})",
+              "skip_method": "GoogleCalendar.quickAddEvent.skip(string?: reason)",
               "fields": [
                 {
-                  "label": "Message",
-                  "slug": "message",
+                  "label": "Quick add text",
+                  "slug": "quick_add",
                   "input_type_family": "Text input",
                   "input_type_sub": null,
                   "required": true,
                   "can_have_default": true,
-                  "helper_text": null,
-                  "filter_code_method": "IfNotifications.sendNotification.setMessage(string: message)"
-                },
-                {
-                  "label": "High priority",
-                  "slug": "high_priority",
-                  "input_type_family": "Dropdown list",
-                  "input_type_sub": null,
-                  "required": false,
-                  "can_have_default": true,
-                  "helper_text": "On Android, this will cause your device to wake up to display the notification.\nOn iOS, this will cause the notification to bypass Do Not Disturb.",
-                  "filter_code_method": "IfNotifications.sendNotification.setHighPriority(string: high_priority)"
+                  "helper_text": "A detailed description of the event, e.g. 'dinner with Alex tomorrow 7pm'.",
+                  "filter_code_method": "GoogleCalendar.quickAddEvent.setQuickAdd(string: quick_add)"
                 }
               ],
-              "namespace": "IfNotifications.sendNotification"
+              "namespace": "GoogleCalendar.quickAddEvent"
             }
           ]
         },
         "it": {
           "services": [
             {
-              "service_slug": "date_and_time",
-              "name": "Date & Time",
-              "brand_color": "#333333",
-              "image_url": "https://assets.ifttt.com/images/channels/3/icons/monochrome_regular.webp",
-              "category": "Gestione del progetto e cose da fare",
+              "service_slug": "email",
+              "name": "Email",
+              "brand_color": "#2468ff",
+              "image_url": "https://assets.ifttt.com/images/channels/6/icons/monochrome_regular.webp",
+              "category": "Strumenti aziendali",
               "tags": "popolare",
               "triggers": [],
               "actions": [],
-              "title": "Automatizza le tue integrazioni di data e ora",
-              "description": "Con IFTTT e il servizio Data e ora, puoi automatizzare le attività in base a intervalli di tempo specifici, garantendo che le tue routine si svolgano senza intoppi. Imposta i trigger per eseguire azioni giornaliere, settimanali, mensili o annuali, tutte in linea con il tuo fuso orario.",
+              "title": "Automatizza le tue integrazioni Email",
+              "description": "Automatizza la tua comunicazione email con IFTTT! Con il servizio Email, puoi inviare e ricevere informazioni importanti senza sforzo.",
               "exists": true,
               "legacy": false,
               "alias_used": null,
               "http_status": 200
             },
             {
-              "service_slug": "if_notifications",
-              "name": "Notifications",
-              "brand_color": "#0099ff",
-              "image_url": "https://assets.ifttt.com/images/channels/651849913/icons/monochrome_regular.webp",
-              "category": "Dispositivi mobili e accessori",
+              "service_slug": "google_calendar",
+              "name": "Google Calendar",
+              "brand_color": "#2C6EFC",
+              "image_url": "https://assets.ifttt.com/images/channels/1396293310/icons/monochrome_regular.webp",
+              "category": "Strumenti aziendali",
               "tags": "popolare",
               "triggers": [],
               "actions": [],
-              "title": "Automatizza le tue integrazioni di notifiche",
-              "description": "Con il servizio Notifiche IFTTT puoi ricevere aggiornamenti tempestivi sul tuo dispositivo Android o iOS. Che si tratti di previsioni meteo giornaliere o avvisi per eventi significativi, questa integrazione ti tiene informato con notifiche personalizzabili inviate direttamente dall'app IFTTT.",
+              "title": "Automatizza le tue integrazioni Google Calendar",
+              "description": "IFTTT ti permette di integrare facilmente Google Calendar con altre app e dispositivi, per automatizzare la creazione di eventi e gestire la tua agenda.",
               "exists": true,
               "legacy": false,
               "alias_used": null,
@@ -691,79 +696,116 @@
           ],
           "triggers": [
             {
-              "service_slug": "date_and_time",
-              "module_name": "every_hour_at",
-              "name": "Ogni ora alle",
-              "description": "Questo trigger si attiva una volta ogni ora: 00, 15, 30 o 45 minuti dopo l'ora.",
-              "api_endpoint_slug": "date_and_time.every_hour_at",
+              "service_slug": "email",
+              "module_name": "send_ifttt_an_email",
+              "name": "Invia un'email a IFTTT",
+              "description": "Invia un'email a trigger@applet.ifttt.com e questo trigger si attiva. Puoi aggiungere un allegato e IFTTT creerà un URL pubblico per il file.",
+              "api_endpoint_slug": "email.send_ifttt_an_email",
               "runtime_method": null,
               "skip_method": null,
-              "fields": [
-                {
-                  "label": "Minutes past the hour",
-                  "slug": "time",
-                  "input_type_family": "Text input",
-                  "input_type_sub": null,
-                  "required": true,
-                  "can_have_default": true,
-                  "helper_text": null,
-                  "filter_code_method": null
-                }
-              ],
+              "fields": [],
               "ingredients": [
                 {
-                  "name": "Controlla l'ora",
-                  "description": "Data e ora in cui è stato controllato questo trigger.",
-                  "slug": "CheckTime",
-                  "dtype": "Stringa",
+                  "name": "Oggetto",
+                  "description": "Riga dell'oggetto dell'email.",
+                  "slug": "Subject",
+                  "dtype": "String",
+                  "example": "Ciao",
+                  "filter_code_key": "Email.sendIftttAnEmail.Subject"
+                },
+                {
+                  "name": "Da",
+                  "description": "Indirizzo email del mittente.",
+                  "slug": "From",
+                  "dtype": "String",
+                  "example": "qualcuno@gmail.com",
+                  "filter_code_key": "Email.sendIftttAnEmail.From"
+                },
+                {
+                  "name": "Corpo",
+                  "description": "Corpo dell'email, senza le firme.",
+                  "slug": "Body",
+                  "dtype": "String",
+                  "example": "Oggi è stata una buona giornata...",
+                  "filter_code_key": "Email.sendIftttAnEmail.Body"
+                },
+                {
+                  "name": "Ricevuta il",
+                  "description": "Data e ora di ricezione dell'email.",
+                  "slug": "ReceivedAt",
+                  "dtype": "String",
                   "example": "23 agosto 2010 alle 23:01",
-                  "filter_code_key": "DateAndTime.everyHourAt.CheckTime"
+                  "filter_code_key": "Email.sendIftttAnEmail.ReceivedAt"
                 }
               ],
-              "namespace": "DateAndTime.everyHourAt"
+              "namespace": "Email.sendIftttAnEmail"
             }
           ],
           "actions": [
             {
-              "service_slug": "if_notifications",
-              "module_name": "send_notification",
-              "name": "Invia una notifica dall'app IFTTT",
-              "description": "Questa azione invierà una notifica ai tuoi dispositivi dall'app IFTTT.",
-              "api_endpoint_slug": "if_notifications.send_notification",
-              "runtime_method": "runAction(\"if_notifications.send_notification\", {})",
-              "skip_method": "IfNotifications.sendNotification.skip(string?: reason)",
+              "service_slug": "google_calendar",
+              "module_name": "quick_add_event",
+              "name": "Aggiungi evento rapido",
+              "description": "Questa azione aggiunge un evento al tuo Google Calendar. Basta includere una descrizione dettagliata di quando e cosa.",
+              "api_endpoint_slug": "google_calendar.quick_add_event",
+              "runtime_method": "runAction(\"google_calendar.quick_add_event\", {})",
+              "skip_method": "GoogleCalendar.quickAddEvent.skip(string?: reason)",
               "fields": [
                 {
-                  "label": "Messaggio",
-                  "slug": "message",
+                  "label": "Testo evento rapido",
+                  "slug": "quick_add",
                   "input_type_family": "Inserimento di testo",
                   "input_type_sub": null,
                   "required": true,
                   "can_have_default": true,
-                  "helper_text": null,
-                  "filter_code_method": "IfNotifications.sendNotification.setMessage(string: message)"
-                },
-                {
-                  "label": "Alta priorità",
-                  "slug": "high_priority",
-                  "input_type_family": "Elenco a discesa",
-                  "input_type_sub": null,
-                  "required": false,
-                  "can_have_default": true,
-                  "helper_text": "Su Android, ciò farà sì che il tuo dispositivo si riattivi per visualizzare la notifica.\nSu iOS, ciò farà sì che la notifica ignori la funzione Non disturbare.",
-                  "filter_code_method": "IfNotifications.sendNotification.setHighPriority(string: high_priority)"
+                  "helper_text": "Una descrizione dettagliata dell'evento, es. 'cena con Marco domani alle 20'.",
+                  "filter_code_method": "GoogleCalendar.quickAddEvent.setQuickAdd(string: quick_add)"
                 }
               ],
-              "namespace": "IfNotifications.sendNotification"
+              "namespace": "GoogleCalendar.quickAddEvent"
             }
           ]
         }
-      }
+      },
+      "test_fixtures": [
+        {
+          "name": "subject_contains_meeting",
+          "description_en": "Email subject contains 'meeting' — should create calendar event",
+          "description_it": "L'oggetto dell'email contiene 'riunione' — deve creare un evento",
+          "getter_values": {
+            "Email.sendIftttAnEmail.Subject": "Team meeting tomorrow at 3pm",
+            "Email.sendIftttAnEmail.From": "boss@company.com",
+            "Email.sendIftttAnEmail.Body": "Please join the weekly sync.",
+            "Email.sendIftttAnEmail.ReceivedAt": "March 15, 2026 at 09:30AM"
+          },
+          "expect_skip": [],
+          "expect_fire": [
+            "GoogleCalendar.quickAddEvent"
+          ],
+          "expect_setters": {}
+        },
+        {
+          "name": "subject_no_meeting",
+          "description_en": "Email subject does not mention 'meeting' — should skip",
+          "description_it": "L'oggetto dell'email non menziona 'riunione' — deve saltare",
+          "getter_values": {
+            "Email.sendIftttAnEmail.Subject": "Weekly newsletter: top stories",
+            "Email.sendIftttAnEmail.From": "news@example.com",
+            "Email.sendIftttAnEmail.Body": "Here are this week's highlights...",
+            "Email.sendIftttAnEmail.ReceivedAt": "March 15, 2026 at 02:00PM"
+          },
+          "expect_skip": [
+            "GoogleCalendar.quickAddEvent"
+          ],
+          "expect_fire": [],
+          "expect_setters": {}
+        }
+      ]
     },
     {
-      "code": "S3",
+      "code": "M1",
       "row_index": 76,
-      "complexity_tag": "simple_skip",
+      "complexity_tag": "C2",
       "services": [
         "augusthome",
         "spotify"
@@ -776,10 +818,10 @@
       ],
       "title_en": "Start Spotify when you unlock the door in the evening",
       "title_it": "Avvia Spotify quando sblocchi la porta la sera",
-      "background_en": "In the evening, when a specific person unlocks the smart lock, you want music to start automatically.",
-      "background_it": "La sera, quando una persona specifica sblocca la serratura smart, vuoi che la musica parta automaticamente.",
-      "if_then_en": "IF the door is unlocked by you during a selected time window THEN start a Spotify playlist.",
-      "if_then_it": "SE la porta viene sbloccata da te in una certa fascia oraria ALLORA avvia una playlist Spotify.",
+      "background_en": "In the evening, when a specific person unlocks the smart lock, you want Spotify to start playing automatically on the active device.",
+      "background_it": "La sera, quando una persona specifica sblocca la serratura smart, vuoi che Spotify avvii automaticamente la riproduzione sul dispositivo attivo.",
+      "if_then_en": "IF the door is unlocked by you during a selected time window THEN start Spotify playback.",
+      "if_then_it": "SE la porta viene sbloccata da te in una certa fascia oraria ALLORA avvia la riproduzione Spotify.",
       "trigger_options": [
         {
           "id": "person_name",
@@ -812,30 +854,14 @@
           ]
         }
       ],
-      "action_options": [
-        {
-          "id": "playlist",
-          "label_en": "Playlist or album",
-          "label_it": "Playlist o album",
-          "description_en": "What to play when you arrive.",
-          "description_it": "Cosa riprodurre quando arrivi.",
-          "example_values_en": [
-            "Relaxing evening",
-            "Chill jazz"
-          ],
-          "example_values_it": [
-            "Sera rilassante",
-            "Jazz tranquillo"
-          ]
-        }
-      ],
+      "action_options": [],
       "intent_examples_en": [
-        "When I unlock the door after 6 PM, start my evening playlist.",
-        "If I come home between 19 and 22, play my chill playlist."
+        "When I unlock the door after 6 PM, start playing music on Spotify.",
+        "If I come home between 19 and 22, resume Spotify playback."
       ],
       "intent_examples_it": [
-        "Quando sblocco la porta dopo le 18, avvia la mia playlist serale.",
-        "Se arrivo a casa tra le 19 e le 22, fai partire la playlist chill."
+        "Quando sblocco la porta dopo le 18, avvia la riproduzione su Spotify.",
+        "Se arrivo a casa tra le 19 e le 22, fai partire la musica su Spotify."
       ],
       "catalog": {
         "en": {
@@ -1042,7 +1068,7 @@
                   "name": "Utente",
                   "description": "L'utente che ha sbloccato il lucchetto.",
                   "slug": "user",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "Giovanni Smith",
                   "filter_code_key": "Augusthome.lockUnlockedBySpecificPerson.User"
                 },
@@ -1050,7 +1076,7 @@
                   "name": "Nome serratura",
                   "description": "Il nome della serratura.",
                   "slug": "lock_name",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "Porta d'ingresso",
                   "filter_code_key": "Augusthome.lockUnlockedBySpecificPerson.LockName"
                 },
@@ -1058,7 +1084,7 @@
                   "name": "Nome della casa",
                   "description": "Il nome della casa associata alla serratura.",
                   "slug": "house_name",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "Casa sulla spiaggia di San Diego",
                   "filter_code_key": "Augusthome.lockUnlockedBySpecificPerson.HouseName"
                 },
@@ -1088,12 +1114,44 @@
             }
           ]
         }
-      }
+      },
+      "test_fixtures": [
+        {
+          "name": "evening_unlock",
+          "description_en": "Door unlocked in the evening (7:30 PM)",
+          "description_it": "Porta sbloccata la sera (19:30)",
+          "getter_values": {
+            "Augusthome.lockUnlockedBySpecificPerson.CreatedAt": "March 10, 2026 at 07:30PM",
+            "Augusthome.lockUnlockedBySpecificPerson.User": "Me",
+            "hour": 19
+          },
+          "expect_skip": [],
+          "expect_fire": [
+            "Spotify.startPlayback"
+          ],
+          "expect_setters": {}
+        },
+        {
+          "name": "morning_unlock",
+          "description_en": "Door unlocked in the morning (8:00 AM)",
+          "description_it": "Porta sbloccata la mattina (8:00)",
+          "getter_values": {
+            "Augusthome.lockUnlockedBySpecificPerson.CreatedAt": "March 10, 2026 at 08:00AM",
+            "Augusthome.lockUnlockedBySpecificPerson.User": "Me",
+            "hour": 8
+          },
+          "expect_skip": [
+            "Spotify.startPlayback"
+          ],
+          "expect_fire": [],
+          "expect_setters": {}
+        }
+      ]
     },
     {
       "code": "C1",
       "row_index": 126,
-      "complexity_tag": "complex_single_action_multi_conditions",
+      "complexity_tag": "C3",
       "services": [
         "green_light_signal",
         "lifx"
@@ -1379,7 +1437,7 @@
                   "name": "Indice di Co2",
                   "description": "Indice di CO2",
                   "slug": "co2_index",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "Basso",
                   "filter_code_key": "GreenLightSignal.co2Level.Co2Index"
                 },
@@ -1387,7 +1445,7 @@
                   "name": "Valore del livello di Co2",
                   "description": "Valore del livello di CO2",
                   "slug": "co2_level_value",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "0",
                   "filter_code_key": "GreenLightSignal.co2Level.Co2LevelValue"
                 },
@@ -1478,12 +1536,70 @@
             }
           ]
         }
-      }
+      },
+      "test_fixtures": [
+        {
+          "name": "low_co2",
+          "description_en": "CO2 level is low (150 g/kWh) — lamp should be green",
+          "description_it": "Livello CO2 basso (150 g/kWh) — lampada verde",
+          "getter_values": {
+            "GreenLightSignal.co2Level.Co2LevelValue": "150",
+            "GreenLightSignal.co2Level.Co2Index": "low"
+          },
+          "expect_skip": [],
+          "expect_fire": [
+            "Lifx.color"
+          ],
+          "expect_setters": {
+            "Lifx.color.setColor": "#00ff00"
+          }
+        },
+        {
+          "name": "medium_co2",
+          "description_en": "CO2 level is medium (400 g/kWh) — lamp should be yellow",
+          "description_it": "Livello CO2 medio (400 g/kWh) — lampada gialla",
+          "getter_values": {
+            "GreenLightSignal.co2Level.Co2LevelValue": "400",
+            "GreenLightSignal.co2Level.Co2Index": "medium"
+          },
+          "expect_skip": [],
+          "expect_fire": [
+            "Lifx.color"
+          ],
+          "expect_setters": {
+            "Lifx.color.setColor": "#ffff00"
+          }
+        },
+        {
+          "name": "high_co2",
+          "description_en": "CO2 level is high (600 g/kWh) — lamp should be red",
+          "description_it": "Livello CO2 alto (600 g/kWh) — lampada rossa",
+          "getter_values": {
+            "GreenLightSignal.co2Level.Co2LevelValue": "600",
+            "GreenLightSignal.co2Level.Co2Index": "high"
+          },
+          "expect_skip": [],
+          "expect_fire": [
+            "Lifx.color"
+          ],
+          "expect_setters": {
+            "Lifx.color.setColor": "#ff0000"
+          }
+        }
+      ],
+      "intent_examples_en": [
+        "When CO₂ levels are low, set the lamp to green; yellow if medium; red if high.",
+        "Change the color of my LIFX lamp based on the current grid carbon intensity."
+      ],
+      "intent_examples_it": [
+        "Quando la CO₂ è bassa, imposta la lampada su verde; giallo se media; rosso se alta.",
+        "Cambia il colore della mia lampada LIFX in base all'intensità di carbonio della rete."
+      ]
     },
     {
       "code": "C2",
       "row_index": 238,
-      "complexity_tag": "complex_multi_action",
+      "complexity_tag": "C3",
       "services": [
         "feed",
         "dropbox"
@@ -1822,7 +1938,7 @@
                   "name": "Titolo della voce",
                   "description": "Il titolo della voce.",
                   "slug": "EntryTitle",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "Giorno del lancio!",
                   "filter_code_key": "Feed.newFeedItem.EntryTitle"
                 },
@@ -1830,7 +1946,7 @@
                   "name": "URL della voce",
                   "description": "L'URL della voce.",
                   "slug": "EntryUrl",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "http://blog.ifttt.com/coming-soon",
                   "filter_code_key": "Feed.newFeedItem.EntryUrl"
                 },
@@ -1838,7 +1954,7 @@
                   "name": "Autore della voce",
                   "description": "Il nome dell'autore della voce.",
                   "slug": "EntryAuthor",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "Linden Tibbets",
                   "filter_code_key": "Feed.newFeedItem.EntryAuthor"
                 },
@@ -1846,7 +1962,7 @@
                   "name": "Contenuto della voce",
                   "description": "Il contenuto della voce può contenere HTML.",
                   "slug": "EntryContent",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "Bene, eccoci qui, blah, blah...",
                   "filter_code_key": "Feed.newFeedItem.EntryContent"
                 },
@@ -1854,7 +1970,7 @@
                   "name": "URL immagine della voce",
                   "description": "URL per la prima immagine nella voce. Se la voce non ha un'immagine punterà a un'immagine segnaposto.",
                   "slug": "EntryImageUrl",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "http://ifttt.com/images/no_image_card.png",
                   "filter_code_key": "Feed.newFeedItem.EntryImageUrl"
                 },
@@ -1862,7 +1978,7 @@
                   "name": "Voce pubblicata",
                   "description": "La data di pubblicazione della voce.",
                   "slug": "EntryPublished",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "23 agosto 2010 alle 23:01",
                   "filter_code_key": "Feed.newFeedItem.EntryPublished"
                 },
@@ -1870,7 +1986,7 @@
                   "name": "Titolo del feed",
                   "description": "Il titolo del feed.",
                   "slug": "FeedTitle",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "blog iftt",
                   "filter_code_key": "Feed.newFeedItem.FeedTitle"
                 },
@@ -1878,7 +1994,7 @@
                   "name": "URL del feed",
                   "description": "URL della pagina normale del feed.",
                   "slug": "FeedUrl",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "http://blog.ifttt.com/",
                   "filter_code_key": "Feed.newFeedItem.FeedUrl"
                 }
@@ -1973,12 +2089,57 @@
             }
           ]
         }
-      }
+      },
+      "test_fixtures": [
+        {
+          "name": "article_with_image",
+          "description_en": "Article with both link and image",
+          "description_it": "Articolo con link e immagine",
+          "getter_values": {
+            "Feed.newFeedItem.EntryTitle": "Test Article",
+            "Feed.newFeedItem.EntryUrl": "https://example.com/article",
+            "Feed.newFeedItem.EntryImageUrl": "https://example.com/img.jpg",
+            "Feed.newFeedItem.EntryContent": "Article content here"
+          },
+          "expect_skip": [],
+          "expect_fire": [
+            "Dropbox.createTextFileDb",
+            "Dropbox.addFileFromUrl"
+          ],
+          "expect_setters": {}
+        },
+        {
+          "name": "article_no_image",
+          "description_en": "Article without image",
+          "description_it": "Articolo senza immagine",
+          "getter_values": {
+            "Feed.newFeedItem.EntryTitle": "Text Only Article",
+            "Feed.newFeedItem.EntryUrl": "https://example.com/text",
+            "Feed.newFeedItem.EntryImageUrl": "",
+            "Feed.newFeedItem.EntryContent": "Text only content"
+          },
+          "expect_skip": [
+            "Dropbox.addFileFromUrl"
+          ],
+          "expect_fire": [
+            "Dropbox.createTextFileDb"
+          ],
+          "expect_setters": {}
+        }
+      ],
+      "intent_examples_en": [
+        "When a new item appears in my RSS feed, save the content as a text file and download the image if present.",
+        "For each new feed article, create a text file with the content and save any attached image to Dropbox."
+      ],
+      "intent_examples_it": [
+        "Quando appare un nuovo elemento nel mio feed RSS, salva il contenuto come file di testo e scarica l'immagine se presente.",
+        "Per ogni nuovo articolo del feed, crea un file di testo col contenuto e salva eventuali immagini su Dropbox."
+      ]
     },
     {
-      "code": "C3",
+      "code": "M2",
       "row_index": 66,
-      "complexity_tag": "complex_single_action_multi_conditions",
+      "complexity_tag": "C2",
       "services": [
         "nj_transit",
         "sms"
@@ -2212,7 +2373,7 @@
                   "name": "Itinerario e orario",
                   "description": "Il titolo della voce.",
                   "slug": "EntryTitle",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "Giorno del lancio!",
                   "filter_code_key": "NjTransit.newBusAdvisory.RouteAndTime"
                 },
@@ -2220,7 +2381,7 @@
                   "name": "Collegamento",
                   "description": "L'URL della voce.",
                   "slug": "EntryUrl",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "http://blog.ifttt.com/coming-soon",
                   "filter_code_key": "NjTransit.newBusAdvisory.Link"
                 },
@@ -2228,7 +2389,7 @@
                   "name": "Contenuto dell'avviso",
                   "description": "Il contenuto della voce può contenere HTML.",
                   "slug": "EntryContent",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "Bene, eccoci qui, blah, blah...",
                   "filter_code_key": "NjTransit.newBusAdvisory.AdvisoryContent"
                 }
@@ -2261,13 +2422,72 @@
             }
           ]
         }
-      }
+      },
+      "test_fixtures": [
+        {
+          "name": "matching_route_commute",
+          "description_en": "Advisory for your route during commute hours",
+          "description_it": "Avviso sulla tua linea durante il tragitto",
+          "getter_values": {
+            "NjTransit.newBusAdvisory.EntryTitle": "Bus 123 - Delays expected",
+            "NjTransit.newBusAdvisory.EntryContent": "Delays on route 123",
+            "NjTransit.newBusAdvisory.EntryUrl": "https://njtransit.com/advisory/1",
+            "hour": 8
+          },
+          "expect_skip": [],
+          "expect_fire": [
+            "Sms.sendMeText"
+          ],
+          "expect_setters": {}
+        },
+        {
+          "name": "wrong_time",
+          "description_en": "Advisory for your route outside commute hours",
+          "description_it": "Avviso sulla tua linea fuori orario",
+          "getter_values": {
+            "NjTransit.newBusAdvisory.EntryTitle": "Bus 123 - Delays expected",
+            "NjTransit.newBusAdvisory.EntryContent": "Delays on route 123",
+            "NjTransit.newBusAdvisory.EntryUrl": "https://njtransit.com/advisory/2",
+            "hour": 14
+          },
+          "expect_skip": [
+            "Sms.sendMeText"
+          ],
+          "expect_fire": [],
+          "expect_setters": {}
+        },
+        {
+          "name": "wrong_route",
+          "description_en": "Advisory for a different route during commute",
+          "description_it": "Avviso per una linea diversa durante il tragitto",
+          "getter_values": {
+            "NjTransit.newBusAdvisory.EntryTitle": "Bus 456 - Service change",
+            "NjTransit.newBusAdvisory.EntryContent": "Service change on route 456",
+            "NjTransit.newBusAdvisory.EntryUrl": "https://njtransit.com/advisory/3",
+            "hour": 8
+          },
+          "expect_skip": [
+            "Sms.sendMeText"
+          ],
+          "expect_fire": [],
+          "expect_setters": {}
+        }
+      ],
+      "intent_examples_en": [
+        "Send me an SMS when there is a bus advisory for my route during commute hours.",
+        "If a NJ Transit advisory mentions my bus line between 7 and 9 AM, text me the details."
+      ],
+      "intent_examples_it": [
+        "Mandami un SMS quando c'è un avviso per la mia linea bus negli orari del tragitto.",
+        "Se un avviso NJ Transit menziona la mia linea tra le 7 e le 9 di mattina, inviami un messaggio con i dettagli."
+      ]
     }
   ],
   "expert": [
     {
       "code": "E1",
       "row_index": 126,
+      "complexity_tag": "C2",
       "base_scenario_ref": "C1",
       "services": [
         "green_light_signal",
@@ -2515,7 +2735,7 @@
                   "name": "Indice di Co2",
                   "description": "Indice di CO2",
                   "slug": "co2_index",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "Basso",
                   "filter_code_key": "GreenLightSignal.co2Level.Co2Index"
                 },
@@ -2523,7 +2743,7 @@
                   "name": "Valore del livello di Co2",
                   "description": "Valore del livello di CO2",
                   "slug": "co2_level_value",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "0",
                   "filter_code_key": "GreenLightSignal.co2Level.Co2LevelValue"
                 },
@@ -2614,11 +2834,62 @@
             }
           ]
         }
-      }
+      },
+      "test_fixtures": [
+        {
+          "name": "low_co2",
+          "description_en": "CO2 level is low (150 g/kWh) — lamp should be green",
+          "description_it": "Livello CO2 basso (150 g/kWh) — lampada verde",
+          "getter_values": {
+            "GreenLightSignal.co2Level.Co2LevelValue": "150",
+            "GreenLightSignal.co2Level.Co2Index": "low"
+          },
+          "expect_skip": [],
+          "expect_fire": [
+            "Lifx.color"
+          ],
+          "expect_setters": {
+            "Lifx.color.setColor": "#00ff00"
+          }
+        },
+        {
+          "name": "medium_co2",
+          "description_en": "CO2 level is medium (400 g/kWh) — lamp should be yellow",
+          "description_it": "Livello CO2 medio (400 g/kWh) — lampada gialla",
+          "getter_values": {
+            "GreenLightSignal.co2Level.Co2LevelValue": "400",
+            "GreenLightSignal.co2Level.Co2Index": "medium"
+          },
+          "expect_skip": [],
+          "expect_fire": [
+            "Lifx.color"
+          ],
+          "expect_setters": {
+            "Lifx.color.setColor": "#ffff00"
+          }
+        },
+        {
+          "name": "high_co2",
+          "description_en": "CO2 level is high (600 g/kWh) — lamp should be red",
+          "description_it": "Livello CO2 alto (600 g/kWh) — lampada rossa",
+          "getter_values": {
+            "GreenLightSignal.co2Level.Co2LevelValue": "600",
+            "GreenLightSignal.co2Level.Co2Index": "high"
+          },
+          "expect_skip": [],
+          "expect_fire": [
+            "Lifx.color"
+          ],
+          "expect_setters": {
+            "Lifx.color.setColor": "#ff0000"
+          }
+        }
+      ]
     },
     {
       "code": "E2",
       "row_index": 84,
+      "complexity_tag": "C1",
       "services": [
         "twitter",
         "telegram"
@@ -2851,7 +3122,7 @@
                   "name": "Testo",
                   "description": "Il tweet stesso.",
                   "slug": "Text",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "Sta mangiando cheerios a colazione.",
                   "filter_code_key": "Twitter.newTweetByUser.Text"
                 },
@@ -2859,7 +3130,7 @@
                   "name": "Nome utente",
                   "description": "Nome utente del tweeter.",
                   "slug": "UserName",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "ltibbets",
                   "filter_code_key": "Twitter.newTweetByUser.UserName"
                 },
@@ -2867,7 +3138,7 @@
                   "name": "Collegamento al tweet",
                   "description": "L'URL del tweet stesso.",
                   "slug": "LinkToTweet",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "http://twitter.com/ifttt/status/33262764734693376",
                   "filter_code_key": "Twitter.newTweetByUser.LinkToTweet"
                 },
@@ -2875,7 +3146,7 @@
                   "name": "Codice incorporamento tweet",
                   "description": "Il codice di incorporamento HTML per il Tweet.",
                   "slug": "TweetEmbedCode",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "<blockquote class=\"twitter-tweet\"><p>Il gruppo di donne: <a href=\"https://t.co/zEviglOupP\">https://t.co/zEviglOupP</a> <a href=\"http://t.co/HPCY5DOSjR\">pic.twitter.com/HPCY5DOSjR</a></p>&mdash; Oggi all'IFTTT (@TodayAtIFTTT) <a href=\"https://twitter.com/Today",
                   "filter_code_key": "Twitter.newTweetByUser.TweetEmbedCode"
                 },
@@ -2883,7 +3154,7 @@
                   "name": "Creato a",
                   "description": "Data e ora in cui è stato creato il tweet.",
                   "slug": "CreatedAt",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "23 agosto 2010 alle 23:01",
                   "filter_code_key": "Twitter.newTweetByUser.CreatedAt"
                 }
@@ -2936,11 +3207,48 @@
             }
           ]
         }
-      }
+      },
+      "test_fixtures": [
+        {
+          "name": "text_only_tweet",
+          "description_en": "Tweet without images — should forward to Telegram",
+          "description_it": "Tweet senza immagini — inoltra su Telegram",
+          "getter_values": {
+            "Twitter.newTweetByUser.Text": "Hello world, just a text tweet",
+            "Twitter.newTweetByUser.UserName": "testuser",
+            "Twitter.newTweetByUser.LinkToTweet": "https://twitter.com/status/123",
+            "Twitter.newTweetByUser.TweetEmbedCode": "<blockquote>Hello world</blockquote>",
+            "Twitter.newTweetByUser.CreatedAt": "March 10, 2026 at 02:00PM"
+          },
+          "expect_skip": [],
+          "expect_fire": [
+            "Telegram.sendMessage"
+          ],
+          "expect_setters": {}
+        },
+        {
+          "name": "tweet_with_image",
+          "description_en": "Tweet with an image — should be skipped",
+          "description_it": "Tweet con immagine — va scartato",
+          "getter_values": {
+            "Twitter.newTweetByUser.Text": "Check this photo!",
+            "Twitter.newTweetByUser.UserName": "testuser",
+            "Twitter.newTweetByUser.LinkToTweet": "https://twitter.com/status/456",
+            "Twitter.newTweetByUser.TweetEmbedCode": "<blockquote><img src=\"pic.jpg\">Check this</blockquote>",
+            "Twitter.newTweetByUser.CreatedAt": "March 10, 2026 at 03:00PM"
+          },
+          "expect_skip": [
+            "Telegram.sendMessage"
+          ],
+          "expect_fire": [],
+          "expect_setters": {}
+        }
+      ]
     },
     {
       "code": "E3",
       "row_index": 238,
+      "complexity_tag": "C3",
       "base_scenario_ref": "C2",
       "services": [
         "feed",
@@ -3241,7 +3549,7 @@
                   "name": "Titolo della voce",
                   "description": "Il titolo della voce.",
                   "slug": "EntryTitle",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "Giorno del lancio!",
                   "filter_code_key": "Feed.newFeedItem.EntryTitle"
                 },
@@ -3249,7 +3557,7 @@
                   "name": "URL della voce",
                   "description": "L'URL della voce.",
                   "slug": "EntryUrl",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "http://blog.ifttt.com/coming-soon",
                   "filter_code_key": "Feed.newFeedItem.EntryUrl"
                 },
@@ -3257,7 +3565,7 @@
                   "name": "Autore della voce",
                   "description": "Il nome dell'autore della voce.",
                   "slug": "EntryAuthor",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "Linden Tibbets",
                   "filter_code_key": "Feed.newFeedItem.EntryAuthor"
                 },
@@ -3265,7 +3573,7 @@
                   "name": "Contenuto della voce",
                   "description": "Il contenuto della voce può contenere HTML.",
                   "slug": "EntryContent",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "Bene, eccoci qui, blah, blah...",
                   "filter_code_key": "Feed.newFeedItem.EntryContent"
                 },
@@ -3273,7 +3581,7 @@
                   "name": "URL immagine della voce",
                   "description": "URL per la prima immagine nella voce. Se la voce non ha un'immagine punterà a un'immagine segnaposto.",
                   "slug": "EntryImageUrl",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "http://ifttt.com/images/no_image_card.png",
                   "filter_code_key": "Feed.newFeedItem.EntryImageUrl"
                 },
@@ -3281,7 +3589,7 @@
                   "name": "Voce pubblicata",
                   "description": "La data di pubblicazione della voce.",
                   "slug": "EntryPublished",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "23 agosto 2010 alle 23:01",
                   "filter_code_key": "Feed.newFeedItem.EntryPublished"
                 },
@@ -3289,7 +3597,7 @@
                   "name": "Titolo del feed",
                   "description": "Il titolo del feed.",
                   "slug": "FeedTitle",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "blog iftt",
                   "filter_code_key": "Feed.newFeedItem.FeedTitle"
                 },
@@ -3297,7 +3605,7 @@
                   "name": "URL del feed",
                   "description": "URL della pagina normale del feed.",
                   "slug": "FeedUrl",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "http://blog.ifttt.com/",
                   "filter_code_key": "Feed.newFeedItem.FeedUrl"
                 }
@@ -3392,11 +3700,49 @@
             }
           ]
         }
-      }
+      },
+      "test_fixtures": [
+        {
+          "name": "article_with_image",
+          "description_en": "Article with both link and image",
+          "description_it": "Articolo con link e immagine",
+          "getter_values": {
+            "Feed.newFeedItem.EntryTitle": "Test Article",
+            "Feed.newFeedItem.EntryUrl": "https://example.com/article",
+            "Feed.newFeedItem.EntryImageUrl": "https://example.com/img.jpg",
+            "Feed.newFeedItem.EntryContent": "Article content here"
+          },
+          "expect_skip": [],
+          "expect_fire": [
+            "Dropbox.createTextFileDb",
+            "Dropbox.addFileFromUrl"
+          ],
+          "expect_setters": {}
+        },
+        {
+          "name": "article_no_image",
+          "description_en": "Article without image",
+          "description_it": "Articolo senza immagine",
+          "getter_values": {
+            "Feed.newFeedItem.EntryTitle": "Text Only Article",
+            "Feed.newFeedItem.EntryUrl": "https://example.com/text",
+            "Feed.newFeedItem.EntryImageUrl": "",
+            "Feed.newFeedItem.EntryContent": "Text only content"
+          },
+          "expect_skip": [
+            "Dropbox.addFileFromUrl"
+          ],
+          "expect_fire": [
+            "Dropbox.createTextFileDb"
+          ],
+          "expect_setters": {}
+        }
+      ]
     },
     {
       "code": "E4",
       "row_index": 92,
+      "complexity_tag": "C2",
       "services": [
         "instagram",
         "facebook_pages"
@@ -3607,7 +3953,7 @@
                   "name": "Didascalia",
                   "description": "",
                   "slug": "Caption",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "Una bella foto",
                   "filter_code_key": "Instagram.anyNewPhotoByYou.Caption"
                 },
@@ -3615,7 +3961,7 @@
                   "name": "URL",
                   "description": "L'URL breve della pagina Instagram della foto.",
                   "slug": "Url",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "http://instagr.am/p/CTGBw/",
                   "filter_code_key": "Instagram.anyNewPhotoByYou.Url"
                 },
@@ -3623,7 +3969,7 @@
                   "name": "URL di origine",
                   "description": "URL del file immagine.",
                   "slug": "SourceUrl",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "http://distillery.s3.amazonaws.com/media/2011/03/16/f22fa6e93e244449b1177c98e8a7a6cf_7.jpg",
                   "filter_code_key": "Instagram.anyNewPhotoByYou.SourceUrl"
                 },
@@ -3631,7 +3977,7 @@
                   "name": "Creato a",
                   "description": "Data e ora in cui è stata scattata la foto.",
                   "slug": "CreatedAt",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "23 agosto 2010 alle 23:01",
                   "filter_code_key": "Instagram.anyNewPhotoByYou.CreatedAt"
                 },
@@ -3639,7 +3985,7 @@
                   "name": "Codice di incorporamento",
                   "description": "Il codice di incorporamento HTML per la foto.",
                   "slug": "EmbedCode",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "<iframe src=\"http://instagr.am/p/CTGBw/embed\" larghezza=\"612\" altezza=\"710\" frameborder=\"0\" scrolling=\"no\"allowtransparency=\"true\"></iframe>",
                   "filter_code_key": "Instagram.anyNewPhotoByYou.EmbedCode"
                 }
@@ -3692,12 +4038,49 @@
             }
           ]
         }
-      }
+      },
+      "test_fixtures": [
+        {
+          "name": "january_photo",
+          "description_en": "Photo posted in January — album \"January 2026\"",
+          "description_it": "Foto pubblicata a gennaio — album \"Gennaio 2026\"",
+          "getter_values": {
+            "Instagram.anyNewPhotoByYou.Caption": "Winter vibes",
+            "Instagram.anyNewPhotoByYou.Url": "https://instagram.com/p/123",
+            "Instagram.anyNewPhotoByYou.SourceUrl": "https://instagram.com/p/123.jpg",
+            "Instagram.anyNewPhotoByYou.CreatedAt": "January 15, 2026 at 02:30PM",
+            "month": 0
+          },
+          "expect_skip": [],
+          "expect_fire": [
+            "FacebookPages.createPhotoPage"
+          ],
+          "expect_setters": {}
+        },
+        {
+          "name": "june_photo",
+          "description_en": "Photo posted in June — album \"June 2026\"",
+          "description_it": "Foto pubblicata a giugno — album \"Giugno 2026\"",
+          "getter_values": {
+            "Instagram.anyNewPhotoByYou.Caption": "Summer fun",
+            "Instagram.anyNewPhotoByYou.Url": "https://instagram.com/p/456",
+            "Instagram.anyNewPhotoByYou.SourceUrl": "https://instagram.com/p/456.jpg",
+            "Instagram.anyNewPhotoByYou.CreatedAt": "June 20, 2026 at 10:00AM",
+            "month": 5
+          },
+          "expect_skip": [],
+          "expect_fire": [
+            "FacebookPages.createPhotoPage"
+          ],
+          "expect_setters": {}
+        }
+      ]
     },
     {
       "code": "E5",
       "row_index": 66,
-      "base_scenario_ref": "C3",
+      "complexity_tag": "C1",
+      "base_scenario_ref": "M2",
       "services": [
         "nj_transit",
         "sms"
@@ -3708,19 +4091,19 @@
       "action_apis": [
         "sms.send_me_text"
       ],
-      "title_en": "Expert commute alerts with multi-criteria checks",
-      "title_it": "Avvisi di pendolarismo avanzati con controlli multipli",
-      "background_en": "You must filter transit advisories using multiple criteria, such as weekday, commute time windows, and route keywords, before deciding whether to send an SMS.",
-      "background_it": "Devi filtrare gli avvisi di trasporto usando più criteri, come giorno della settimana, fasce orarie di pendolarismo e parole chiave sulla linea, prima di decidere se inviare un SMS.",
-      "if_then_en": "IF a new advisory matches the route keyword AND occurs during commute hours on a weekday THEN send an SMS; OTHERWISE skip it.",
-      "if_then_it": "SE un nuovo avviso riguarda la linea indicata E cade negli orari di pendolarismo in un giorno feriale ALLORA invia un SMS; ALTRIMENTI scartalo.",
+      "title_en": "SMS alert for NJ Transit bus advisories on your route",
+      "title_it": "Avviso SMS per gli avvisi NJ Transit sulla tua linea",
+      "background_en": "You commute by bus and want to receive an SMS whenever NJ Transit posts an advisory that mentions your route number.",
+      "background_it": "Prendi il bus per andare al lavoro e vuoi ricevere un SMS ogni volta che NJ Transit pubblica un avviso che menziona la tua linea.",
+      "if_then_en": "IF a new bus advisory mentions your route keyword THEN send you an SMS with the advisory details.",
+      "if_then_it": "SE un nuovo avviso bus menziona la tua linea ALLORA inviati un SMS con i dettagli.",
       "intent_examples_en": [
-        "Send me an SMS only for bus advisories on my route during weekday mornings.",
-        "Ignore advisories outside my commute hours."
+        "Send me an SMS whenever there is a NJ Transit advisory for route 123.",
+        "Text me the details of any bus advisory that mentions my route."
       ],
       "intent_examples_it": [
-        "Mandami un SMS solo per avvisi della mia linea durante le mattine feriali.",
-        "Ignora gli avvisi fuori dagli orari del mio tragitto."
+        "Mandami un SMS ogni volta che c'è un avviso NJ Transit per la linea 123.",
+        "Inviami un messaggio con i dettagli di ogni avviso bus che menziona la mia linea."
       ],
       "catalog": {
         "en": {
@@ -3894,7 +4277,7 @@
                   "name": "Itinerario e orario",
                   "description": "Il titolo della voce.",
                   "slug": "EntryTitle",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "Giorno del lancio!",
                   "filter_code_key": "NjTransit.newBusAdvisory.RouteAndTime"
                 },
@@ -3902,7 +4285,7 @@
                   "name": "Collegamento",
                   "description": "L'URL della voce.",
                   "slug": "EntryUrl",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "http://blog.ifttt.com/coming-soon",
                   "filter_code_key": "NjTransit.newBusAdvisory.Link"
                 },
@@ -3910,7 +4293,7 @@
                   "name": "Contenuto dell'avviso",
                   "description": "Il contenuto della voce può contenere HTML.",
                   "slug": "EntryContent",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "Bene, eccoci qui, blah, blah...",
                   "filter_code_key": "NjTransit.newBusAdvisory.AdvisoryContent"
                 }
@@ -3943,11 +4326,59 @@
             }
           ]
         }
-      }
+      },
+      "test_fixtures": [
+        {
+          "name": "route_match",
+          "description_en": "Advisory mentioning your route — should fire",
+          "description_it": "Avviso che menziona la tua linea — deve attivarsi",
+          "getter_values": {
+            "NjTransit.newBusAdvisory.EntryTitle": "Bus 123 - Delays expected",
+            "NjTransit.newBusAdvisory.EntryContent": "Delays on route 123 due to construction.",
+            "NjTransit.newBusAdvisory.EntryUrl": "https://njtransit.com/advisory/1"
+          },
+          "expect_skip": [],
+          "expect_fire": [
+            "Sms.sendMeText"
+          ],
+          "expect_setters": {}
+        },
+        {
+          "name": "route_no_match",
+          "description_en": "Advisory for a different route — should skip",
+          "description_it": "Avviso per un'altra linea — va scartato",
+          "getter_values": {
+            "NjTransit.newBusAdvisory.EntryTitle": "Bus 456 - Service change",
+            "NjTransit.newBusAdvisory.EntryContent": "Route 456 detour in effect.",
+            "NjTransit.newBusAdvisory.EntryUrl": "https://njtransit.com/advisory/2"
+          },
+          "expect_skip": [
+            "Sms.sendMeText"
+          ],
+          "expect_fire": [],
+          "expect_setters": {}
+        },
+        {
+          "name": "route_in_content_only",
+          "description_en": "Route mentioned in body but not title — should fire",
+          "description_it": "Linea menzionata nel corpo ma non nel titolo — deve attivarsi",
+          "getter_values": {
+            "NjTransit.newBusAdvisory.EntryTitle": "General service advisory",
+            "NjTransit.newBusAdvisory.EntryContent": "Routes affected: 123, 789. Expect delays.",
+            "NjTransit.newBusAdvisory.EntryUrl": "https://njtransit.com/advisory/3"
+          },
+          "expect_skip": [],
+          "expect_fire": [
+            "Sms.sendMeText"
+          ],
+          "expect_setters": {}
+        }
+      ]
     },
     {
       "code": "E6",
       "row_index": 305,
+      "complexity_tag": "C3",
       "services": [
         "twitter",
         "if_notifications",
@@ -4226,7 +4657,7 @@
                   "name": "Testo",
                   "description": "Il tweet stesso.",
                   "slug": "Text",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "Sta mangiando cheerios a colazione.",
                   "filter_code_key": "Twitter.newTweetByUser.Text"
                 },
@@ -4234,7 +4665,7 @@
                   "name": "Nome utente",
                   "description": "Nome utente del tweeter.",
                   "slug": "UserName",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "ltibbets",
                   "filter_code_key": "Twitter.newTweetByUser.UserName"
                 },
@@ -4242,7 +4673,7 @@
                   "name": "Collegamento al tweet",
                   "description": "L'URL del tweet stesso.",
                   "slug": "LinkToTweet",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "http://twitter.com/ifttt/status/33262764734693376",
                   "filter_code_key": "Twitter.newTweetByUser.LinkToTweet"
                 },
@@ -4250,7 +4681,7 @@
                   "name": "Codice incorporamento tweet",
                   "description": "Il codice di incorporamento HTML per il Tweet.",
                   "slug": "TweetEmbedCode",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "<blockquote class=\"twitter-tweet\"><p>Il gruppo di donne: <a href=\"https://t.co/zEviglOupP\">https://t.co/zEviglOupP</a> <a href=\"http://t.co/HPCY5DOSjR\">pic.twitter.com/HPCY5DOSjR</a></p>&mdash; Oggi all'IFTTT (@TodayAtIFTTT) <a href=\"https://twitter.com/Today",
                   "filter_code_key": "Twitter.newTweetByUser.TweetEmbedCode"
                 },
@@ -4258,7 +4689,7 @@
                   "name": "Creato a",
                   "description": "Data e ora in cui è stato creato il tweet.",
                   "slug": "CreatedAt",
-                  "dtype": "Stringa",
+                  "dtype": "String",
                   "example": "23 agosto 2010 alle 23:01",
                   "filter_code_key": "Twitter.newTweetByUser.CreatedAt"
                 }
@@ -4323,7 +4754,62 @@
             }
           ]
         }
-      }
+      },
+      "test_fixtures": [
+        {
+          "name": "daytime_important",
+          "description_en": "Important tweet during day — notify + save to Feedly",
+          "description_it": "Tweet importante di giorno — notifica + salva su Feedly",
+          "getter_values": {
+            "Twitter.newTweetByUser.Text": "Breaking: important announcement with link https://example.com",
+            "Twitter.newTweetByUser.LinkToTweet": "https://twitter.com/status/123",
+            "Twitter.newTweetByUser.CreatedAt": "March 10, 2026 at 02:00PM",
+            "hour": 14
+          },
+          "expect_skip": [],
+          "expect_fire": [
+            "IfNotifications.sendNotification",
+            "Feedly.createNewEntryFeedly"
+          ],
+          "expect_setters": {}
+        },
+        {
+          "name": "nighttime_important",
+          "description_en": "Important tweet at night — skip notification, save to Feedly",
+          "description_it": "Tweet importante di notte — niente notifica, salva su Feedly",
+          "getter_values": {
+            "Twitter.newTweetByUser.Text": "Breaking: important news https://example.com",
+            "Twitter.newTweetByUser.LinkToTweet": "https://twitter.com/status/456",
+            "Twitter.newTweetByUser.CreatedAt": "March 10, 2026 at 03:00AM",
+            "hour": 3
+          },
+          "expect_skip": [
+            "IfNotifications.sendNotification"
+          ],
+          "expect_fire": [
+            "Feedly.createNewEntryFeedly"
+          ],
+          "expect_setters": {}
+        },
+        {
+          "name": "daytime_casual",
+          "description_en": "Casual tweet during day — notify only, no Feedly save",
+          "description_it": "Tweet casuale di giorno — solo notifica, no Feedly",
+          "getter_values": {
+            "Twitter.newTweetByUser.Text": "Just had coffee",
+            "Twitter.newTweetByUser.LinkToTweet": "https://twitter.com/status/789",
+            "Twitter.newTweetByUser.CreatedAt": "March 10, 2026 at 02:30PM",
+            "hour": 14
+          },
+          "expect_skip": [
+            "Feedly.createNewEntryFeedly"
+          ],
+          "expect_fire": [
+            "IfNotifications.sendNotification"
+          ],
+          "expect_setters": {}
+        }
+      ]
     }
   ],
   "questionnaires": {
@@ -4345,3 +4831,6 @@
     }
   }
 }
+
+
+

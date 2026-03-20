@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; }
+  body { overflow: hidden; height: 0; }
+</style>
+</head>
+<body>
+<script>
+(function() {
+  /* ---- Streamlit component bridge ---- */
+  function sendMsg(type, data) {
+    window.parent.postMessage(
+      Object.assign({isStreamlitMessage: true, type: type}, data), "*"
+    );
+  }
+  function setComponentValue(v) { sendMsg("streamlit:setComponentValue", {value: v}); }
+  function setFrameHeight(h) { sendMsg("streamlit:setFrameHeight", {height: h || 0}); }
+  function setReady() { sendMsg("streamlit:componentReady", {apiVersion: 1}); }
+
+  /* ---- State ---- */
+  var nonce = 0;
+  var steps = [];
+  var currentStep = 0;
+  var active = false;
+  var lblNext = "Next";
+  var lblBack = "Back";
+  var lblSkip = "Skip tutorial";
+  var lblDone = "Got it!";
+  var parentDoc = null;
+  var parentWin = null;
+  var spotlightEl = null;
+  var calloutEl = null;
+  var resizeTimer = null;
+  var renderRetryTimer = null;
+  var renderRetryCount = 0;
+  var MAX_RENDER_RETRIES = 20;   /* ~4 seconds total */
+  var RENDER_RETRY_MS = 200;
+
+  /* ---- z-index layers ---- */
+  var Z_SPOTLIGHT = 50000;
+  var Z_CALLOUT   = 50001;
+
+  /* ---- Helpers ---- */
+  function qs(sel) {
+    try { return parentDoc.querySelector(sel); } catch(e) { return null; }
+  }
+
+  function getStepTarget(step) {
+    if (!step || !step.selector) return null;
+    return qs(step.selector);
+  }
+
+  function getViewport() {
+    if (parentWin) return { w: parentWin.innerWidth, h: parentWin.innerHeight };
+    return { w: 1024, h: 768 };
+  }
+
+  /* ---- Build overlay elements in parent DOM ---- */
+  function ensureElements() {
+    if (!parentDoc) {
+      try {
+        parentDoc = window.parent.document;
+        parentWin = window.parent;
+      } catch(ex) { return false; }
+    }
+    if (!parentDoc) return false;
+
+    /* Spotlight */
+    spotlightEl = parentDoc.getElementById("tutorial-spotlight");
+    if (!spotlightEl) {
+      spotlightEl = parentDoc.createElement("div");
+      spotlightEl.id = "tutorial-spotlight";
+      spotlightEl.style.cssText =
+        "position:fixed;top:0;left:0;width:100%;height:100%;z-index:" + Z_SPOTLIGHT + ";" +
+        "pointer-events:auto;opacity:0;display:none;" +
+        "transition:opacity .3s ease,top .4s ease,left .4s ease,width .4s ease,height .4s ease,box-shadow .4s ease,background .3s ease;";
+      parentDoc.body.appendChild(spotlightEl);
+    }
+
+    /* Callout */
+    calloutEl = parentDoc.getElementById("tutorial-callout");
+    if (!calloutEl) {
+      calloutEl = parentDoc.createElement("div");
+      calloutEl.id = "tutorial-callout";
+      calloutEl.style.cssText =
+        "position:fixed;z-index:" + Z_CALLOUT + ";max-width:340px;width:340px;" +
+        "background:#fff;border-radius:12px;border-top:3px solid #3b82f6;" +
+        "box-shadow:0 8px 32px rgba(0,0,0,0.18);padding:20px 22px 16px;" +
+        "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;" +
+        "transition:opacity .3s ease,transform .3s ease,left .35s ease,top .35s ease;" +
+        "opacity:0;display:none;";
+      parentDoc.body.appendChild(calloutEl);
+    }
+    return true;
+  }
+
+  /* ---- Position the callout relative to the target ---- */
+  function positionCallout(target, placement) {
+    if (!calloutEl) return;
+    var vp = getViewport();
+    var cw = 340;
+    /* Measure actual callout height after innerHTML was set */
+    var ch = calloutEl.offsetHeight || 180;
+    var pad = 14;
+
+    if (!target) {
+      /* Centered fallback */
+      calloutEl.style.left = Math.max(8, (vp.w - cw) / 2) + "px";
+      calloutEl.style.top  = Math.max(8, (vp.h - ch) / 2) + "px";
+      return;
+    }
+
+    var rect = target.getBoundingClientRect();
+    var left, top;
+
+    if (placement === "top") {
+      left = rect.left + (rect.width - cw) / 2;
+      top  = rect.top - ch - pad;
+      if (top < 8) top = rect.bottom + pad;          /* flip to bottom */
+    } else if (placement === "right") {
+      left = rect.right + pad;
+      top  = rect.top + (rect.height - ch) / 2;
+      if (left + cw > vp.w - 8) left = rect.left - cw - pad;  /* flip to left */
+    } else if (placement === "center") {
+      left = (vp.w - cw) / 2;
+      top  = (vp.h - ch) / 2;
+    } else {
+      /* "bottom" */
+      left = rect.left + (rect.width - cw) / 2;
+      top  = rect.bottom + pad;
+      if (top + ch > vp.h - 8) top = rect.top - ch - pad;  /* flip to top */
+    }
+
+    left = Math.max(8, Math.min(left, vp.w - cw - 8));
+    top  = Math.max(8, Math.min(top,  vp.h - ch - 8));
+
+    calloutEl.style.left = left + "px";
+    calloutEl.style.top  = top  + "px";
+  }
+
+  /* ---- Render spotlight hole around target ---- */
+  function renderSpotlight(target) {
+    if (!spotlightEl) return;
+    if (!target) {
+      spotlightEl.style.top        = "0";
+      spotlightEl.style.left       = "0";
+      spotlightEl.style.width      = "100%";
+      spotlightEl.style.height     = "100%";
+      spotlightEl.style.borderRadius = "0";
+      spotlightEl.style.boxShadow  = "none";
+      spotlightEl.style.background = "rgba(0,0,0,0.55)";
+      return;
+    }
+
+    var rect = target.getBoundingClientRect();
+    var pad = 6, r = 10;
+
+    spotlightEl.style.background   = "none";
+    spotlightEl.style.top          = (rect.top  - pad) + "px";
+    spotlightEl.style.left         = (rect.left - pad) + "px";
+    spotlightEl.style.width        = (rect.width  + pad * 2) + "px";
+    spotlightEl.style.height       = (rect.height + pad * 2) + "px";
+    spotlightEl.style.borderRadius = r + "px";
+    spotlightEl.style.boxShadow    = "0 0 0 9999px rgba(0,0,0,0.55)";
+  }
+
+  /* ---- Build callout HTML ---- */
+  function buildCalloutHTML(step, isFirst, isLast, stepNum) {
+    return (
+      '<div style="margin-bottom:12px;">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">' +
+          '<span style="font-size:0.92rem;font-weight:700;color:#111827;">' + escHtml(step.title || "") + '</span>' +
+          '<span style="font-size:0.72rem;color:#94a3b8;font-weight:500;">' + stepNum + '</span>' +
+        '</div>' +
+        '<div style="font-size:0.85rem;color:#6b7280;line-height:1.5;">' + escHtml(step.body || "") + '</div>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:8px;">' +
+        '<button id="tc-skip" style="' +
+          'background:none;border:none;color:#94a3b8;font-size:0.78rem;cursor:pointer;' +
+          'text-decoration:underline;padding:4px 0;margin-right:auto;">' +
+          escHtml(lblSkip) +
+        '</button>' +
+        (isFirst ? '' :
+          '<button id="tc-back" style="' +
+            'background:#fff;border:1px solid #d1d5db;color:#374151;font-size:0.82rem;' +
+            'padding:6px 16px;border-radius:8px;cursor:pointer;font-weight:500;">' +
+            escHtml(lblBack) +
+          '</button>'
+        ) +
+        '<button id="tc-next" style="' +
+          'background:#3b82f6;border:none;color:#fff;font-size:0.82rem;' +
+          'padding:6px 20px;border-radius:8px;cursor:pointer;font-weight:600;">' +
+          escHtml(isLast ? lblDone : lblNext) +
+        '</button>' +
+      '</div>'
+    );
+  }
+
+  /* ---- Render current step ---- */
+  function render() {
+    if (!ensureElements()) return;
+    if (!active || steps.length === 0) { hide(); return; }
+
+    var step = steps[currentStep] || steps[0];
+    var target = getStepTarget(step);
+
+    /* If target selector exists but element isn't in the DOM yet, retry */
+    if (step.selector && !target && renderRetryCount < MAX_RENDER_RETRIES) {
+      renderRetryCount++;
+      /* Hide stale callout during retries so user can't click old buttons */
+      if (calloutEl) calloutEl.style.display = "none";
+      clearTimeout(renderRetryTimer);
+      renderRetryTimer = setTimeout(render, RENDER_RETRY_MS);
+      return;
+    }
+    renderRetryCount = 0;
+
+    /* Scroll target into view */
+    if (target) {
+      target.scrollIntoView({behavior: "smooth", block: "nearest"});
+    }
+
+    /* Determine if this is a step transition (callout already visible) or first show */
+    var isTransition = (calloutEl && calloutEl.style.display === "block" &&
+                        calloutEl.style.opacity === "1");
+
+    function showStep() {
+      if (!spotlightEl || !calloutEl) return;
+      var t = getStepTarget(step);
+
+      /* Spotlight — animate to new position */
+      spotlightEl.style.display = "block";
+      renderSpotlight(t);
+      spotlightEl.style.opacity = "1";
+
+      /* Callout content */
+      var isFirst = currentStep === 0;
+      var isLast  = currentStep === steps.length - 1;
+      var stepNum = (currentStep + 1) + "/" + steps.length;
+      calloutEl.innerHTML = buildCalloutHTML(step, isFirst, isLast, stepNum);
+
+      /* Show + position callout */
+      calloutEl.style.display = "block";
+      calloutEl.style.opacity = "0";
+      calloutEl.style.transform = "translateY(8px)";
+      requestAnimationFrame(function() {
+        positionCallout(t, step.placement || "bottom");
+        requestAnimationFrame(function() {
+          calloutEl.style.opacity = "1";
+          calloutEl.style.transform = "translateY(0)";
+        });
+      });
+
+      /* Bind buttons — nonce ensures Streamlit always sees a value change */
+      bindBtn("tc-skip", function() {
+        setComponentValue({action: "skip", step: currentStep, _n: ++nonce});
+      });
+      bindBtn("tc-back", function() {
+        setComponentValue({action: "back", step: currentStep, _n: ++nonce});
+      });
+      bindBtn("tc-next", function() {
+        setComponentValue({action: isLast ? "done" : "next", step: currentStep, _n: ++nonce});
+      });
+    }
+
+    if (isTransition) {
+      /* Crossfade: fade out old callout, then show new */
+      calloutEl.style.opacity = "0";
+      calloutEl.style.transform = "translateY(-8px)";
+      setTimeout(function() {
+        /* Scroll target into view during the fade-out */
+        var t = getStepTarget(step);
+        if (t) t.scrollIntoView({behavior: "smooth", block: "nearest"});
+        setTimeout(showStep, 150);
+      }, 200);
+    } else {
+      /* First appearance — scroll then show after brief delay */
+      setTimeout(showStep, 150);
+    }
+  }
+
+  function bindBtn(id, handler) {
+    var el = calloutEl && calloutEl.querySelector("#" + id);
+    if (el) el.onclick = handler;
+  }
+
+  function hide() {
+    if (spotlightEl) {
+      spotlightEl.style.opacity = "0";
+      setTimeout(function() {
+        if (spotlightEl) spotlightEl.style.display = "none";
+      }, 300);
+    }
+    if (calloutEl) {
+      calloutEl.style.opacity = "0";
+      setTimeout(function() {
+        if (calloutEl) calloutEl.style.display = "none";
+      }, 250);
+    }
+  }
+
+  function cleanup() {
+    clearTimeout(renderRetryTimer);
+    if (spotlightEl && spotlightEl.parentNode) spotlightEl.parentNode.removeChild(spotlightEl);
+    if (calloutEl   && calloutEl.parentNode)   calloutEl.parentNode.removeChild(calloutEl);
+    spotlightEl = null;
+    calloutEl   = null;
+  }
+
+  function escHtml(s) {
+    if (!s) return "";
+    var d = document.createElement("div");
+    d.appendChild(document.createTextNode(s));
+    return d.innerHTML;
+  }
+
+  /* ---- Resize handler ---- */
+  function onResize() {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function() { if (active) render(); }, 150);
+  }
+
+  /* ---- Message listener ---- */
+  window.addEventListener("message", function(e) {
+    if (!e.data || e.data.type !== "streamlit:render") return;
+    var args = e.data.args || {};
+
+    if (!parentDoc) {
+      try { parentDoc = window.parent.document; parentWin = window.parent; }
+      catch(ex) { return; }
+    }
+
+    steps       = args.steps        || [];
+    currentStep = args.current_step  || 0;
+    active      = !!args.active;
+    lblNext     = args.lbl_next || "Next";
+    lblBack     = args.lbl_back || "Back";
+    lblSkip     = args.lbl_skip || "Skip tutorial";
+    lblDone     = args.lbl_done || "Got it!";
+
+    setFrameHeight(0);
+
+    if (active && steps.length > 0) {
+      renderRetryCount = 0;
+      render();
+      parentWin.addEventListener("resize", onResize);
+    } else {
+      /* active=false received — perform full cleanup (remove DOM elements) */
+      cleanup();
+      if (parentWin) parentWin.removeEventListener("resize", onResize);
+    }
+  });
+
+  /* ---- Cleanup on unload ---- */
+  window.addEventListener("beforeunload", cleanup);
+
+  /* ---- Ready ---- */
+  setReady();
+  setFrameHeight(0);
+})();
+</script>
+</body>
+</html>

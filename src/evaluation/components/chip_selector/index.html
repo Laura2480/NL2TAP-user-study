@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: transparent;
+    color: #111827;
+    line-height: 1.5;
+    padding: 2px 0;
+  }
+  .hybrid-flow {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: #d1d5db transparent;
+  }
+  .hybrid-flow::-webkit-scrollbar { height: 5px; }
+  .hybrid-flow::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+  .hybrid-flow::-webkit-scrollbar-track { background: transparent; }
+
+  .hybrid-chip {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 9px;
+    padding: 9px 16px;
+    cursor: pointer;
+    transition: all 0.15s;
+    user-select: none;
+
+    max-width: 350px;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .hybrid-chip:hover {
+    box-shadow: 0 0 0 1px rgba(147,197,253,.5);
+  }
+  .hybrid-chip:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+  }
+  .hybrid-chip.selected::before {
+    content: '';
+    position: absolute;
+    top: 9px;
+    right: 10px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background-size: 18px;
+    background-position: center;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6.5 11.5L3.5 8.5l1-1 2 2 4.5-4.5 1 1z' fill='white'/%3E%3C/svg%3E");
+  }
+  .hybrid-chip .hc-name {
+    font-weight: 600;
+    font-size: 0.92rem;
+    padding-right: 22px;
+    color: #111827;
+  }
+  .hybrid-chip .hc-desc {
+    font-size: 0.8rem;
+    color: #6b7280;
+    line-height: 1.35;
+  }
+
+  /* Trigger: blue */
+  .trigger-group .hybrid-chip:hover { border-color: #2563eb; }
+  .trigger-group .hybrid-chip.selected {
+    border-color: #2563eb;
+    background: #eff6ff;
+  }
+  .trigger-group .hybrid-chip.selected::before { background-color: #2563eb; }
+  .trigger-group .hybrid-chip.selected .hc-name { color: #1e40af; }
+  .trigger-group .hybrid-chip.selected .hc-desc { color: #2563eb; opacity: .75; }
+
+  /* Action: amber */
+  .action-group .hybrid-chip:hover { border-color: #d97706; }
+  .action-group .hybrid-chip.selected {
+    border-color: #d97706;
+    background: #fffbeb;
+  }
+  .action-group .hybrid-chip.selected::before { background-color: #d97706; }
+  .action-group .hybrid-chip.selected .hc-name { color: #92400e; }
+  .action-group .hybrid-chip.selected .hc-desc { color: #d97706; opacity: .75; }
+</style>
+</head>
+<body>
+<div id="root" class="hybrid-flow" role="listbox" aria-label="Field selection"></div>
+<script>
+(function() {
+  /* ---- Streamlit component bridge ---- */
+  function sendMsg(type, data) {
+    window.parent.postMessage(
+      Object.assign({isStreamlitMessage: true, type: type}, data), "*"
+    );
+  }
+  function setComponentValue(v) { sendMsg("streamlit:setComponentValue", {value: v}); }
+  function setFrameHeight(h) { sendMsg("streamlit:setFrameHeight", {height: h || document.body.scrollHeight}); }
+  function setReady() { sendMsg("streamlit:componentReady", {apiVersion: 1}); }
+
+  /* ---- State ---- */
+  var items = [];
+  var selected = new Set();
+  var groupType = "trigger";
+  var root = document.getElementById("root");
+
+  function render() {
+    root.className = "hybrid-flow " + groupType + "-group";
+    root.innerHTML = "";
+    items.forEach(function(it) {
+      var el = document.createElement("div");
+      el.className = "hybrid-chip" + (selected.has(it.key) ? " selected" : "");
+      el.setAttribute("role", "option");
+      el.setAttribute("aria-selected", selected.has(it.key) ? "true" : "false");
+      el.setAttribute("tabindex", "0");
+      el.setAttribute("title", it.desc || it.name);
+
+      var nm = document.createElement("span");
+      nm.className = "hc-name";
+      nm.textContent = it.name;
+      el.appendChild(nm);
+
+      if (it.desc) {
+        var ds = document.createElement("span");
+        ds.className = "hc-desc";
+        ds.textContent = it.desc;
+        el.appendChild(ds);
+      }
+
+      function toggle() {
+        if (selected.has(it.key)) { selected.delete(it.key); }
+        else { selected.add(it.key); }
+        render();
+        setComponentValue(Array.from(selected));
+      }
+
+      el.addEventListener("click", toggle);
+      el.addEventListener("keydown", function(e) {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+      });
+
+      root.appendChild(el);
+    });
+    requestAnimationFrame(function() { setFrameHeight(document.body.scrollHeight + 2); });
+  }
+
+  function setsEqual(a, b) {
+    if (a.size !== b.size) return false;
+    for (var x of a) { if (!b.has(x)) return false; }
+    return true;
+  }
+
+  /* ---- Listen for render events from Streamlit ---- */
+  window.addEventListener("message", function(e) {
+    if (e.data.type !== "streamlit:render") return;
+    var args = e.data.args || {};
+    var newItems = args.items || [];
+    var newSel = new Set(args.selected || []);
+    var newType = args.group_type || "trigger";
+
+    var changed = JSON.stringify(newItems) !== JSON.stringify(items)
+                  || !setsEqual(newSel, selected)
+                  || newType !== groupType;
+    if (changed) {
+      items = newItems;
+      selected = newSel;
+      groupType = newType;
+      render();
+    }
+  });
+
+  /* ---- Auto-resize on layout change ---- */
+  new ResizeObserver(function() {
+    setFrameHeight(document.body.scrollHeight + 2);
+  }).observe(document.body);
+
+  setReady();
+})();
+</script>
+</body>
+</html>

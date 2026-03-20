@@ -2,7 +2,7 @@
 Agent Support — orchestrator agent with tool-calling for iterative code refinement.
 
 Provides:
-1. Deterministic API fix suggestions (fuzzy matching)
+1. API fix suggestions (LLM semantic matching with difflib fallback)
 2. LLM diagnosis prompt builder (legacy, still used by orchestrator internally)
 3. Orchestrator agent — tool-calling LLM that decides when to generate code,
    analyzes results, suggests intent improvements, and converses with the user.
@@ -36,9 +36,12 @@ def suggest_api_fixes(
     actions_path: str = None,
     catalog_triggers: List[dict] = None,
     catalog_actions: List[dict] = None,
+    endpoint: str = "",
+    model: str = "",
 ) -> List[Dict[str, str]]:
     """
-    Deterministic suggestions for invalid getters/setters using fuzzy matching.
+    Suggestions for invalid getters/setters — LLM semantic matching when available,
+    difflib fuzzy matching as fallback.
 
     Returns list of dicts:
       {"type": "getter"|"setter"|"skip", "invalid": str, "suggestion": str, "label": str}
@@ -72,47 +75,51 @@ def suggest_api_fixes(
         labels.update(dl.get("getter_labels", {}))
         labels.update(dl.get("setter_labels", {}))
 
+    getter_pool = sorted(allowed_getters)
+    setter_pool = sorted(allowed_setters)
+
+    # --- LLM matching (single call for all invalids) or difflib fallback ---
+    llm_matches: Dict[str, Optional[str]] = {}
+    if endpoint and model:
+        all_invalids = list(api.invalid_getters) + list(api.invalid_setters)
+        combined_pool = getter_pool + setter_pool
+        if all_invalids and combined_pool:
+            from .llm_api_matcher import match_api_names
+            llm_matches = match_api_names(
+                all_invalids, combined_pool, endpoint, model,
+            )
+
     fixes: List[Dict[str, str]] = []
 
     # --- Getter fixes ---
-    getter_pool = sorted(allowed_getters)
     for inv in api.invalid_getters:
-        matches = difflib.get_close_matches(inv, getter_pool, n=1, cutoff=0.4)
-        if matches:
-            best = matches[0]
-            fixes.append({
-                "type": "getter",
-                "invalid": inv,
-                "suggestion": best,
-                "label": labels.get(best, best),
-            })
-        else:
-            fixes.append({
-                "type": "getter",
-                "invalid": inv,
-                "suggestion": "",
-                "label": "",
-            })
+        best = llm_matches.get(inv)  # None if LLM wasn't called or no match
+        if best is None:
+            # Fallback to difflib
+            matches = difflib.get_close_matches(inv, getter_pool, n=1, cutoff=0.4)
+            best = matches[0] if matches else None
+
+        fixes.append({
+            "type": "getter",
+            "invalid": inv,
+            "suggestion": best or "",
+            "label": labels.get(best, best) if best else "",
+        })
 
     # --- Setter fixes ---
-    setter_pool = sorted(allowed_setters)
     for inv in api.invalid_setters:
-        matches = difflib.get_close_matches(inv, setter_pool, n=1, cutoff=0.4)
-        if matches:
-            best = matches[0]
-            fixes.append({
-                "type": "setter",
-                "invalid": inv,
-                "suggestion": best,
-                "label": labels.get(best, best),
-            })
-        else:
-            fixes.append({
-                "type": "setter",
-                "invalid": inv,
-                "suggestion": "",
-                "label": "",
-            })
+        best = llm_matches.get(inv)  # None if LLM wasn't called or no match
+        if best is None:
+            # Fallback to difflib
+            matches = difflib.get_close_matches(inv, setter_pool, n=1, cutoff=0.4)
+            best = matches[0] if matches else None
+
+        fixes.append({
+            "type": "setter",
+            "invalid": inv,
+            "suggestion": best or "",
+            "label": labels.get(best, best) if best else "",
+        })
 
     return fixes
 
@@ -495,7 +502,7 @@ ORCHESTRATOR_TOOLS = [
     }
 ]
 
-_ORCHESTRATOR_SYSTEM = """\
+_ORCHESTRATOR_SYSTEM_A = """\
 You are an expert IFTTT Filter Code assistant. You help users create and refine \
 JavaScript filter code for IFTTT applets through conversation.
 
@@ -506,20 +513,20 @@ from a natural language intent and validates it against the IFTTT API catalog.
 
 1. **When the user describes what they want the filter to do** → call \
 `generate_and_validate` with their intent (pass the full intent, not a summary).
-2. **After receiving results** → analyze the validation output:
-   - Comment on what works and what doesn't
+2. **After receiving results** → analyze the validation output and produce a \
+structured summary:
+   - Start by summarizing what the automation does (reference the behavior_summary)
    - If there are API errors (invalid getters/setters), explain what went wrong
-   - If the behavioral outcomes don't match the intent, explain the mismatch
-   - **If you see issues, suggest an improved intent**, explaining:
-     - WHAT you would change and WHY it would help
-     - Write the improved intent clearly so the user can evaluate it
-     - End your message with the improved intent on its own line, \
-preceded by the marker `[SUGGESTED_INTENT]` and followed by `[/SUGGESTED_INTENT]`
-   - If the code looks correct, say so clearly
+   - If the behavioral outcomes don't match the intent, explain the mismatch clearly
+   - If there are warnings (uncovered actions, missing setters), mention them
+   - If there are issues, describe them clearly but do NOT suggest a rewritten intent.
+   - If the code looks correct and behavior matches the intent, say so clearly and briefly
 3. **When the user asks questions, wants clarification, or discusses the code** \
 → just respond conversationally. Do NOT call the tool.
-4. **When the user asks to regenerate or try a different approach** → call the tool \
-with the new or refined intent.
+4. **When the user asks to regenerate or sends a revised message** → call the tool. \
+Build an improved intent that incorporates what you learned from previous attempts \
+(fix API errors, adjust logic, keep what worked). Pass the FULL improved intent to \
+the tool, not a summary or diff.
 5. **NEVER call the tool multiple times in one turn**. Always present results and \
 wait for the user's decision.
 6. **NEVER invent API calls**. Only reference getters/setters that appear in the \
@@ -538,6 +545,171 @@ setters are also called on it in the same flow. skip() always wins.
 Write ALL text in {response_lang}. Only code identifiers and API names stay in English.\
 """
 
+_ORCHESTRATOR_SYSTEM_B = """\
+You are an expert IFTTT Filter Code assistant. You help users create and refine \
+JavaScript filter code for IFTTT applets through conversation.
+
+You have ONE tool: `generate_and_validate` — it generates JavaScript filter code \
+from a natural language intent and validates it against the IFTTT API catalog.
+
+## Your behavior:
+
+1. **When the user describes what they want the filter to do** → call \
+`generate_and_validate` with their intent (pass the full intent, not a summary).
+2. **After receiving results** → analyze the validation output:
+   - Comment on what works and what doesn't
+   - If there are API errors (invalid getters/setters), explain what went wrong \
+and which correct getter/setter from the Available API should be used instead
+   - If the behavioral outcomes don't match the intent, explain the mismatch
+   - **If you see ANY issue** (API errors, behavioral mismatch, wrong logic), \
+you MUST end your response with BOTH markers below. This is mandatory:
+     [SUGGESTED_INTENT]the improved intent text here[/SUGGESTED_INTENT]
+     [SUGGESTED_FIELDS]comma-separated list of correct getter keys and setter methods[/SUGGESTED_FIELDS]
+     Example: if invalid getter was MinTemp and correct is Weather.tomorrowsWeatherAtTime.LowTempCelsius:
+     [SUGGESTED_FIELDS]Weather.tomorrowsWeatherAtTime.LowTempCelsius, IfNotifications.sendNotification.setMessage()[/SUGGESTED_FIELDS]
+     Use the EXACT full getter/setter names from "Available API for this scenario" below.
+   - **If the code is correct and matches the intent** → say so clearly, \
+then STILL end with BOTH markers: suggest a clearer or more precise version \
+of the intent and list all the relevant API fields. Always output markers.
+3. **When the user asks questions or discusses the code** → respond conversationally. \
+Do NOT call the tool.
+4. **When the user asks to regenerate or sends a revised message** → call the tool. \
+Build an improved intent that incorporates what you learned from previous attempts \
+(fix API errors, adjust logic, keep what worked). Pass the FULL improved intent to \
+the tool, not a summary or diff.
+5. **NEVER call the tool multiple times in one turn**.
+6. **NEVER invent API calls**. Only reference getters/setters from the Available API list.
+
+## CRITICAL: Marker format
+ALWAYS end your response with BOTH markers after calling the tool — whether the code \
+is correct or has issues. Never output one marker without the other.
+The [SUGGESTED_FIELDS] must contain the correct API field names from the list below, \
+NOT the invalid ones from the generated code. Include ALL fields needed for the rule.
+
+## IFTTT Platform Rules:
+- skip() is STICKY: if called on an action, that action will NOT execute even if \
+setters are also called on it in the same flow. skip() always wins.
+- Actions neither set nor skipped will fire with default/empty values (usually a bug).
+- Meta.currentUserTime.* is always available as a global getter.
+
+## Available API for this scenario:
+{api_surface}
+
+## Response language:
+Write ALL text in {response_lang}. Only code identifiers and API names stay in English.\
+"""
+
+_ORCHESTRATOR_SYSTEM_NONEXPERT_A = """\
+You are a friendly automation assistant. You help users create and refine \
+automations for their smart devices and online services through conversation.
+
+You have ONE tool: `generate_and_validate` — it creates an automation \
+from a natural language description and checks if it works correctly.
+
+## Your behavior:
+
+1. **When the user describes what they want** → call `generate_and_validate` \
+with their description (pass the full description, not a summary).
+2. **After receiving results** → analyze what the automation does and produce a \
+structured summary:
+   - Start by describing the overall behavior in plain language: what happens when, \
+what gets blocked, under which conditions
+   - If the behavior doesn't match what the user asked for, explain the mismatch \
+in simple terms (e.g., "The notification is sent even when it shouldn't be")
+   - If there are warnings (e.g., an action that never receives any data), mention \
+this in behavioral terms
+   - **NEVER mention code, JavaScript, variables, getters, setters, or API names**
+   - If there are issues, describe them clearly but do NOT suggest a new description.
+   - If everything looks correct and matches the intent, say so clearly and briefly
+3. **When the user asks questions or wants clarification** → respond \
+conversationally. Do NOT call the tool.
+4. **When the user wants to try again** → call the tool with an improved description. \
+Keep what worked and fix what didn't, based on the previous result.
+5. **NEVER call the tool multiple times in one turn**.
+6. **NEVER mention technical details** like code, functions, API calls, or \
+variable names. Always speak in terms of behaviors and actions.
+
+## How to describe automation behavior:
+- "When the temperature drops below your threshold, you get a notification"
+- "The music starts playing when you unlock the door in the evening"
+- "The notification is blocked because the temperature is above the threshold"
+- NEVER say things like "the code calls setMessage()" or "the getter returns..."
+
+## Invalid data fields:
+If the tool result shows invalid_getters or invalid_setters, describe the \
+consequence in behavioral terms, e.g.: "The automation cannot read the \
+minimum temperature from the service, so the condition may not work correctly." \
+Do NOT mention getter/setter names — explain what information is missing \
+and how it affects the automation's behavior.
+
+## Available capabilities for this scenario:
+{api_surface_behavioral}
+
+## Response language:
+Write ALL text in {response_lang}.\
+"""
+
+_ORCHESTRATOR_SYSTEM_NONEXPERT_B = """\
+You are a friendly automation assistant. You help users create and refine \
+automations for their smart devices and online services through conversation.
+
+You have ONE tool: `generate_and_validate` — it creates an automation \
+from a natural language description and checks if it works correctly.
+
+## Your behavior:
+
+1. **When the user describes what they want** → call `generate_and_validate` \
+with their description (pass the full description, not a summary).
+2. **After receiving results** → analyze what the automation does:
+   - Describe the behavior in plain language: what happens when, what gets blocked
+   - If the behavior doesn't match what the user asked for, explain the mismatch \
+in simple terms (e.g., "The notification is sent even when it shouldn't be")
+   - **NEVER mention code, JavaScript, variables, getters, setters, or API names** \
+in your explanation text
+   - **If you see ANY issue** (behavioral mismatch, missing data, wrong logic), \
+you MUST end your response with BOTH markers below. This is mandatory:
+     [SUGGESTED_INTENT]the improved description in plain language[/SUGGESTED_INTENT]
+     [SUGGESTED_FIELDS]comma-separated list of correct getter keys and setter methods[/SUGGESTED_FIELDS]
+     In SUGGESTED_FIELDS use the exact API names from the "Internal field reference" below.
+     The SUGGESTED_FIELDS marker is for the system only — the user won't see it directly.
+   - **If everything looks correct** → say so clearly, \
+then STILL end with BOTH markers: suggest a clearer or more complete version \
+of the description and list all the relevant fields. Always output markers.
+3. **When the user asks questions or wants clarification** → respond \
+conversationally. Do NOT call the tool.
+4. **When the user wants to try again** → call the tool with an improved description. \
+Keep what worked and fix what didn't, based on the previous result.
+5. **NEVER call the tool multiple times in one turn**.
+6. **NEVER mention technical details** like code, functions, API calls, or \
+variable names in your explanation. Always speak in terms of behaviors and actions.
+
+## CRITICAL: Marker format
+ALWAYS end your response with BOTH markers after calling the tool — whether the result \
+is correct or has issues. Never output one marker without the other.
+Use the EXACT getter/setter names from "Internal field reference" in the SUGGESTED_FIELDS, \
+NOT the invalid names from the generated code. Include ALL fields needed for the rule.
+
+## How to describe automation behavior:
+- "When the temperature drops below your threshold, you get a notification"
+- "The music starts playing when you unlock the door in the evening"
+- "The notification is blocked because the temperature is above the threshold"
+- NEVER say things like "the code calls setMessage()" or "the getter returns..."
+
+## Invalid data fields:
+If the tool result shows invalid_getters or invalid_setters, describe the \
+consequence in behavioral terms, e.g.: "The automation cannot read the \
+minimum temperature from the service, so the condition may not work correctly."
+
+## Available capabilities for this scenario:
+{api_surface_behavioral}
+
+## Internal field reference (for SUGGESTED_FIELDS marker only — never show to user):
+{api_surface_technical}
+
+## Response language:
+Write ALL text in {response_lang}.\
+"""
+
 
 @dataclass
 class OrchestratorResult:
@@ -547,6 +719,7 @@ class OrchestratorResult:
     tool_called: bool = False
     intent_used: str = ""
     suggested_intent: str = ""
+    suggested_fields: List[str] = field(default_factory=list)
     updated_messages: List[Dict[str, Any]] = field(default_factory=list)
 
 
@@ -601,6 +774,27 @@ def _extract_suggested_intent(text: str) -> Tuple[str, str]:
     return clean, suggested
 
 
+def _extract_suggested_fields(text: str) -> Tuple[str, List[str]]:
+    """Extract [SUGGESTED_FIELDS]...[/SUGGESTED_FIELDS] from orchestrator response.
+
+    Returns (clean_text, list_of_field_keys). Field keys are trimmed strings.
+    """
+    m = re.search(
+        r"\[SUGGESTED_FIELDS\]\s*(.*?)\s*\[/SUGGESTED_FIELDS\]",
+        text, re.DOTALL,
+    )
+    if not m:
+        return text, []
+    raw = m.group(1).strip()
+    fields = [f.strip() for f in raw.split(",") if f.strip()]
+    clean = text[:m.start()].rstrip()
+    # Also strip trailing content after the marker (rare)
+    tail = text[m.end():].strip()
+    if tail:
+        clean = clean + "\n" + tail
+    return clean, fields
+
+
 def build_api_surface_text(
     trigger_slugs: List[str],
     action_slugs: List[str],
@@ -640,6 +834,41 @@ def build_api_surface_text(
     return "\n".join(lines) if lines else "N/A"
 
 
+def build_api_surface_behavioral(
+    trigger_slugs: List[str],
+    action_slugs: List[str],
+    trigger_index: dict,
+    action_index: dict,
+) -> str:
+    """Build a behavioral (non-technical) API surface description for non-expert orchestrator."""
+    lines = []
+
+    for slug in trigger_slugs:
+        trig = trigger_index.get(slug)
+        if not trig:
+            continue
+        name = trig.get("name", slug)
+        lines.append(f"Trigger: {name}")
+        for ing in trig.get("ingredients", []):
+            ing_name = ing.get("name", "")
+            if ing_name:
+                lines.append(f"  - Available data: {ing_name}")
+
+    for slug in action_slugs:
+        act = action_index.get(slug)
+        if not act:
+            continue
+        name = act.get("name", slug)
+        lines.append(f"Action: {name} (can be blocked)")
+        for fld in act.get("fields", []):
+            label = fld.get("label", fld.get("slug", ""))
+            if label:
+                lines.append(f"  - Configurable: {label}")
+
+    return "\n".join(lines) if lines else "N/A"
+
+
+
 def run_orchestrator_turn(
     history: List[Dict[str, Any]],
     user_message: str,
@@ -648,7 +877,10 @@ def run_orchestrator_turn(
     model: str,
     lang: str = "en",
     api_surface_text: str = "",
+    api_surface_technical: str = "",
     timeout: int = 180,
+    user_type: str = "expert",
+    condition: str = "B",
 ) -> OrchestratorResult:
     """
     Run one turn of the orchestrator agent.
@@ -660,8 +892,11 @@ def run_orchestrator_turn(
         endpoint: OpenAI-compatible chat completions URL
         model: model identifier
         lang: response language
-        api_surface_text: pre-built API surface description
+        api_surface_text: pre-built API surface description (behavioral for non_expert, technical for expert)
+        api_surface_technical: technical API surface (for non_expert B's SUGGESTED_FIELDS reference)
         timeout: request timeout in seconds
+        user_type: "expert" or "non_expert" — selects system prompt style
+        condition: "A" (baseline, no suggestions) or "B" (assisted, with suggestions)
 
     Returns:
         OrchestratorResult with assistant text, optional generation data,
@@ -669,14 +904,34 @@ def run_orchestrator_turn(
     """
     response_lang = "Italian" if lang == "it" else "English"
 
+    # Select prompt based on (user_type, condition)
+    _PROMPT_MAP = {
+        ("expert", "A"): _ORCHESTRATOR_SYSTEM_A,
+        ("expert", "B"): _ORCHESTRATOR_SYSTEM_B,
+        ("non_expert", "A"): _ORCHESTRATOR_SYSTEM_NONEXPERT_A,
+        ("non_expert", "B"): _ORCHESTRATOR_SYSTEM_NONEXPERT_B,
+    }
+
     messages = list(history)
     if not messages or messages[0].get("role") != "system":
-        messages.insert(0, {
-            "role": "system",
-            "content": _ORCHESTRATOR_SYSTEM.format(
+        template = _PROMPT_MAP.get((user_type, condition), _ORCHESTRATOR_SYSTEM_B)
+        if user_type == "non_expert":
+            format_args = {
+                "response_lang": response_lang,
+                "api_surface_behavioral": api_surface_text or "N/A",
+            }
+            # Non-expert B needs technical surface for SUGGESTED_FIELDS reference
+            if condition == "B":
+                format_args["api_surface_technical"] = api_surface_technical or api_surface_text or "N/A"
+            sys_content = template.format(**format_args)
+        else:
+            sys_content = template.format(
                 response_lang=response_lang,
                 api_surface=api_surface_text or "N/A",
-            ),
+            )
+        messages.insert(0, {
+            "role": "system",
+            "content": sys_content,
         })
 
     messages.append({"role": "user", "content": user_message})
@@ -709,10 +964,16 @@ def run_orchestrator_turn(
     if not tool_calls:
         text = assistant_msg.get("content", "")
         clean_text, suggested = _extract_suggested_intent(text)
+        clean_text, sug_fields = _extract_suggested_fields(clean_text)
+        # Hard gate: condition A never produces suggestions
+        if condition == "A":
+            suggested = ""
+            sug_fields = []
         return OrchestratorResult(
             assistant_text=clean_text,
             tool_called=False,
             suggested_intent=suggested,
+            suggested_fields=sug_fields,
             updated_messages=messages,
         )
 
@@ -724,7 +985,8 @@ def run_orchestrator_turn(
         fn_args = {}
     intent = fn_args.get("intent", user_message)
 
-    code, l1, conditions, api_fixes = tool_executor(intent)
+    tool_result = tool_executor(intent)
+    code, l1, conditions, api_fixes = tool_result
 
     # Serialize result for orchestrator
     tool_result_str = _serialize_l1_for_orchestrator(code, l1)
@@ -754,6 +1016,25 @@ def run_orchestrator_turn(
     messages.append({"role": "assistant", "content": commentary})
 
     clean_text, suggested = _extract_suggested_intent(commentary)
+    clean_text, sug_fields = _extract_suggested_fields(clean_text)
+
+    # Hard gate: condition A NEVER produces suggestions — strip any markers
+    # the LLM might have output despite the system prompt not requesting them.
+    if condition == "A":
+        suggested = ""
+        sug_fields = []
+
+    # Condition B: always show suggestions if the LLM produced them.
+    # No post-processing stripping — the study needs consistent suggestion
+    # visibility to compare conditions A vs B experimentally.
+
+    # Fallback: if LLM suggested an intent but forgot fields, and there are
+    # API fixes, extract the correct fields from api_fixes
+    if condition == "B" and suggested and not sug_fields and api_fixes:
+        for fix in api_fixes:
+            suggestion = fix.get("suggestion", "")
+            if suggestion:
+                sug_fields.append(suggestion)
 
     # Build L1 HTML summary (lightweight — for the card)
     from .feedback import L1Report  # avoid circular at module level
@@ -772,5 +1053,6 @@ def run_orchestrator_turn(
         tool_called=True,
         intent_used=intent,
         suggested_intent=suggested,
+        suggested_fields=sug_fields,
         updated_messages=messages,
     )
