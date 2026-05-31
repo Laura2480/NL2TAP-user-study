@@ -1,0 +1,79 @@
+kind,category,pool_count,pool_pct,test_count,test_pct
+trigger,Appliances,27,1.13,0,0.0
+trigger,Blogging,48,2.01,2,0.57
+trigger,Bookmarking,38,1.59,2,0.57
+trigger,Business tools,22,0.92,0,0.0
+trigger,Calendars & scheduling,245,10.27,23,6.55
+trigger,Clocks & displays,7,0.29,0,0.0
+trigger,Cloud storage,44,1.84,1,0.28
+trigger,Communication,29,1.22,1,0.28
+trigger,Connected car,3,0.13,0,0.0
+trigger,Contacts,22,0.92,0,0.0
+trigger,DIY electronics,26,1.09,0,0.0
+trigger,Developer tools,22,0.92,0,0.0
+trigger,Email,47,1.97,0,0.0
+trigger,Environment control & monitoring,92,3.86,10,2.85
+trigger,Finance & payments,37,1.55,14,3.99
+trigger,Gaming & Entertainment,11,0.46,3,0.85
+trigger,Gardening,1,0.04,8,2.28
+trigger,Government,27,1.13,0,0.0
+trigger,Health & fitness,57,2.39,2,0.57
+trigger,Lighting,19,0.8,0,0.0
+trigger,Location,90,3.77,31,8.83
+trigger,Mobile devices & accessories,151,6.33,14,3.99
+trigger,Music,44,1.84,1,0.28
+trigger,News & information,187,7.84,21,5.98
+trigger,Non-profits,5,0.21,0,0.0
+trigger,Notes,21,0.88,8,2.28
+trigger,Notifications,42,1.76,4,1.14
+trigger,Pet trackers,0,0.0,11,3.13
+trigger,Photo & video,153,6.41,16,4.56
+trigger,Power monitoring & management,32,1.34,4,1.14
+trigger,Routers & computer accessories,9,0.38,1,0.28
+trigger,Security & monitoring systems,108,4.53,18,5.13
+trigger,Shopping,1,0.04,0,0.0
+trigger,Smart hubs & systems,107,4.48,4,1.14
+trigger,Social networks,359,15.05,112,31.91
+trigger,Survey tools,2,0.08,0,0.0
+trigger,Tags & beacons,3,0.13,0,0.0
+trigger,Task management & to-dos,74,3.1,2,0.57
+trigger,Time management & tracking,6,0.25,0,0.0
+trigger,Travel & transit,2,0.08,22,6.27
+trigger,Weather,166,6.96,16,4.56
+action,Appliances,20,0.84,2,0.57
+action,Blinds,22,0.92,1,0.28
+action,Blogging,52,2.18,3,0.85
+action,Bookmarking,41,1.72,2,0.57
+action,Business tools,48,2.01,7,1.99
+action,Calendars & scheduling,48,2.01,7,1.99
+action,Clocks & displays,3,0.13,0,0.0
+action,Cloud storage,287,12.03,13,3.7
+action,Communication,139,5.83,24,6.84
+action,Contacts,2,0.08,0,0.0
+action,DIY electronics,11,0.46,0,0.0
+action,Developer tools,5,0.21,0,0.0
+action,Email,270,11.32,25,7.12
+action,Environment control & monitoring,92,3.86,3,0.85
+action,Finance & payments,27,1.13,17,4.84
+action,Gaming & Entertainment,0,0.0,5,1.42
+action,Gardening,16,0.67,13,3.7
+action,Health & fitness,9,0.38,0,0.0
+action,Journaling & personal data,16,0.67,0,0.0
+action,Lighting,278,11.65,39,11.11
+action,Mobile devices & accessories,123,5.16,13,3.7
+action,Music,45,1.89,7,1.99
+action,News & information,9,0.38,54,15.38
+action,Notes,135,5.66,4,1.14
+action,Notifications,134,5.62,112,31.91
+action,Photo & video,38,1.59,0,0.0
+action,Power monitoring & management,62,2.6,7,1.99
+action,Routers & computer accessories,12,0.5,0,0.0
+action,Security & monitoring systems,71,2.98,3,0.85
+action,Shopping,3,0.13,0,0.0
+action,Smart hubs & systems,152,6.37,9,2.56
+action,Social networks,219,9.18,44,12.54
+action,Task management & to-dos,90,3.77,6,1.71
+action,Time management & tracking,15,0.63,0,0.0
+action,Travel & transit,0,0.0,1,0.28
+action,Voice assistants,4,0.17,0,0.0
+action,Weather,3,0.13,7,1.99

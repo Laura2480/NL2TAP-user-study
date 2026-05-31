@@ -1,0 +1,9 @@
+# ── Only replication_package/ is public ──
+# Ignore everything, then whitelist replication_package
+/*
+!.gitignore
+!README.md
+!replication_package/
+
+# Never publish Python bytecode caches inside the whitelisted package
+replication_package/**/__pycache__/
