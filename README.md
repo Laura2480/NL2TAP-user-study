@@ -1,6 +1,6 @@
 # LLM-Assisted Behavioral Customization for End-User Automation in Trigger-Action Platforms
 
-> **Behaviour & Information Technology** (under revision)
+> **Behaviour & Information Technology** (accepted, 2026)
 
 ## Abstract
 
@@ -116,9 +116,9 @@ python compute_metrics.py
 ```
 
 The script prints, in a single run, every paper-reported user-study metric:
-internal consistency (Cronbach's alpha for SUS / TLX / TOAST), Table 4
+internal consistency (Cronbach's alpha for SUS / TLX / TOAST), Table 5
 questionnaire results by expertise group (M +/- SD, 95% CI, Cohen's d,
-Mann-Whitney U), Table 5 behavioural outcomes by complexity class, Spearman
+Mann-Whitney U), Table 6 behavioural outcomes by complexity class, Spearman
 cross-instrument correlations, and the Cohen's kappa inter-rater reliability
 added in R2. Output values match the figures reported in the paper within
 paper-rounding precision.
