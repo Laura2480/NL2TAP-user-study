@@ -7,3 +7,6 @@
 
 # Never publish Python bytecode caches inside the whitelisted package
 replication_package/**/__pycache__/
+
+# Internal cross-check file, not part of the public package
+replication_package/data/user_study/sus_individual.csv
